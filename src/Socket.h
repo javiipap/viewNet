@@ -18,14 +18,8 @@ class Socket {
 
   void recieve_from(Message& message, sockaddr_in& address) const;
 
-  int slisten(int backlog = 4) const;
-
-  int accept(struct sockaddr* addr, socklen_t* addrlen, int flags = 0) const;
-
   static sockaddr_in make_ip_address(
       int port, const std::string& ip_address = std::string());
-
-  ssize_t ssend(const Message& message, int flags) const;
 
   ~Socket();
 

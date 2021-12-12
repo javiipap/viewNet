@@ -6,6 +6,7 @@ MappedFile::MappedFile(std::string pathname, int flags) {
   fstat(fd_, &st);
   size_ = st.st_size;
   mem_start_ = (char*)mmap(NULL, size_, PROT_WRITE, MAP_SHARED, fd_, 0);
+  close(fd_);
 }
 
 ssize_t MappedFile::read(void* buf, size_t size) {
@@ -24,4 +25,4 @@ ssize_t MappedFile::write(void* buf, size_t size) {
   return saved;
 }
 
-MappedFile::~MappedFile() { close(fd_); }
+MappedFile::~MappedFile() { munmap(mem_start_, size_); }

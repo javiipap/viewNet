@@ -43,8 +43,4 @@ sockaddr_in Socket::make_ip_address(int port, const std::string& ip_address) {
   return {AF_INET, htons(port), address};
 }
 
-ssize_t Socket::ssend(const Message& message, int flags) const {
-  return send(fd_, &message.text, sizeof(message.text), flags);
-}
-
 Socket::~Socket() { close(fd_); }

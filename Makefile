@@ -12,10 +12,7 @@
 # ------------------------------------------------
 
 # project name (generate executable with this name)
-SERVER   = server
-CLIENT   = client
-SERVER_THREADS   = threaded_server
-CLIENT_THREADS   = threaded_client
+PROGNAME   = viewNet
 
 CC       = g++
 # compiling flags here
@@ -30,31 +27,11 @@ SRCDIR   = src
 OBJDIR   = obj
 BINDIR   = bin
 
-SERVER_SRC  := $(patsubst $(SRCDIR)/%.cc, $(BINDIR)/%.o, $(filter-out $(SRCDIR)/client.cc $(SRCDIR)/client_threads.cc $(SRCDIR)/server_threads.cc, $(wildcard $(SRCDIR)/*.cc)))
-CLIENT_SRC  := $(patsubst $(SRCDIR)/%.cc, $(BINDIR)/%.o, $(filter-out $(SRCDIR)/server.cc $(SRCDIR)/client_threads.cc $(SRCDIR)/server_threads.cc, $(wildcard $(SRCDIR)/*.cc)))
+SRC  := $(patsubst $(SRCDIR)/%.cc, $(BINDIR)/%.o, $(wildcard $(SRCDIR)/*.cc))
 
-SERVER_THREADS_SRC  := $(filter-out $(SRCDIR)/server.cc, $(SERVER_SRC))
-CLIENT_THREADS_SRC  := $(filter-out $(SRCDIR)/client.cc, $(CLIENT_SRC))
-
-
-$(SERVER): $(SERVER_SRC)
-	@echo $(SERVER_SRC)
-	@$(LINKER) $(SERVER_SRC) $(LFLAGS) -o $(BINDIR)/$@
-	@echo "Linking complete!"
-
-$(CLIENT): $(CLIENT_SRC)
-	@echo $(CLIENT_SRC)
-	@$(LINKER) $(CLIENT_SRC) $(LFLAGS) -o $(BINDIR)/$@
-	@echo "Linking complete!"
-
-$(SERVER_THREADS): $(SERVER_THREADS_SRC)
-	@echo $(SERVER_THREADS_SRC)
-	@$(LINKER) $(SERVER_THREADS_SRC) $(LFLAGS) -o $(BINDIR)/$@
-	@echo "Linking complete!"
-
-$(CLIENT_THREADS): $(CLIENT_THREADS_SRC)
-	@echo $(CLIENT_THREADS_SRC)
-	@$(LINKER) $(CLIENT_THREADS_SRC) $(LFLAGS) -o $(BINDIR)/$@
+$(PROGNAME): $(SRC)
+	@echo $(SRC)
+	@$(LINKER) $(SRC) $(LFLAGS) -o $(BINDIR)/$(PROGNAME)
 	@echo "Linking complete!"
 
 $(BINDIR)/%.o: $(SRCDIR)/%.cc

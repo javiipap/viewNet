@@ -7,19 +7,21 @@
 #include "functions.h"
 
 int protected_main(int argc, char* argv[]) {
-  std::string filename = "public/";
-  filename += argv[1];
+  std::string filename = "public/1024.txt";
+  std::string ip = "127.0.0.1";
 
-  Socket socket(make_ip_address(25565, "127.0.0.1"));
+  if (argc == 2) {
+    filename = "public/";
+    filename += argv[1];
+  } else if (argc > 2) {
+    ip = argv[2];
+  }
 
-  int bytes_read = 0;
-
-  int childs = 0;
-
-  sockaddr_in addr{};
-  Message buff;
+  Socket socket(make_ip_address(25565, ip));
   std::cout << "Waiting for connections..." << std::endl;
 
+  struct sockaddr_in addr {};
+  Message buff;
   socket.recieve_from(buff, addr);
   std::cout << "Recieved connection from: " << inet_ntoa(addr.sin_addr)
             << std::endl;
@@ -27,6 +29,7 @@ int protected_main(int argc, char* argv[]) {
   File file(filename, O_RDONLY);
   Message file_buffer;
   char* file_buffer_beggin = file_buffer.text.begin();
+  int bytes_read = 0;
 
   do {
     if (file_buffer_beggin == file_buffer.text.begin()) {
@@ -38,11 +41,9 @@ int protected_main(int argc, char* argv[]) {
     bytes_read = file.fread(file_buffer_beggin, sizeof(file_buffer.text));
     if (bytes_read > 0) {
       file_buffer.chunk_size = bytes_read;
-      std::cout << file_buffer.chunk_size << std::endl;
       socket.send_to(file_buffer, addr);
     } else {
-      std::cout << std::endl
-                << "Sent " << filename << " to: " << inet_ntoa(addr.sin_addr)
+      std::cout << "Sent " << filename << " to: " << inet_ntoa(addr.sin_addr)
                 << std::endl;
       Message end_of_file;
       end_of_file.text[0] = '\0';
@@ -61,7 +62,7 @@ int protected_main(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
   try {
     return protected_main(argc, argv);
-  } catch (std::runtime_error& e) {
+  } catch (std::system_error& e) {
     std::cerr << "viewNet: " << e.what() << std::endl;
     return 1;
   }

@@ -14,12 +14,21 @@ class Socket {
  public:
   Socket(sockaddr_in local_address);
 
+  /**
+   * @brief Envía un mensaje a otro socket.
+   * @param[in] message Mensaje a enviar.
+   * @param[in] address Dirección del socket remoto.
+   * @return Bytes enviados con éxito.
+   */
   void send_to(const Message& message, const sockaddr_in& address) const;
 
+  /**
+   * @brief Recibe un mensaje de otro socket.
+   * @param[out] message Estructura de datos donde guardar el mensaje.
+   * @param[in] address Dirección del socket remoto.
+   * @return Bytes recibidos con éxito.
+   */
   void recieve_from(Message& message, sockaddr_in& address) const;
-
-  static sockaddr_in make_ip_address(
-      int port, const std::string& ip_address = std::string());
 
   ~Socket();
 

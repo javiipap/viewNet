@@ -1,7 +1,17 @@
 /**
- * Los parámetros de las funciones no usan la std para poder operar con columnas
- * o filas de manera indistinguible
- * @ref: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * AES.h: Interfaz de la clase AES, encargada de cifrar simétricamente de
+ *         acuerdo con el estandar AES. Admite claves de 128, 192 o 256 bits.
+ * @ref https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf
+ * Revision history:
+ *                22/12/2021 - Creación (primera versión) del código
  */
 
 #include <stdio.h>
@@ -17,45 +27,62 @@ class AES {
  public:
   enum KeyLength { AES_128 = 16, AES_192 = 24, AES_256 = 32 };
 
-  AES(KeyLength key_length);
+  AES(KeyLength key_length, uint8_t* key = nullptr);
 
-  void set_key(unsigned char* key, KeyLength key_length);
+  void set_key(uint8_t* key, KeyLength key_length);
 
   /**
-   * padding: ISO/IEC 7816
-   *
-   *
+   * @brief Dado un conjunto de caracteres este método calcula su cifrado.
+   * @param[in] input Buffer a encriptar.
+   * @param[in] length Tamaño del buffer.
+   * @param[out] output Buffer donde guardar el input encriptado.
    */
-  void Encrypt(const unsigned char* input, int length, unsigned char* output);
+  void Encrypt(const uint8_t* input, int length, uint8_t* output);
 
-  void Decrypt(const unsigned char* input, int length, unsigned char* output);
+  /**
+   * @brief Dado un conjunto de caracteres encriptados este método calcula el
+   *        texto original.
+   * @param[in] input Buffer encriptado.
+   * @param[in] length Tamaño del buffer
+   * @param[out] output Buffer donde guardar el input desencriptado.
+   */
+  void Decrypt(const uint8_t* input, int length, uint8_t* output);
 
-  void EncryptBlock(const unsigned char input[16], unsigned char output[16]);
+  /**
+   * @brief Dado un bloque de 128 bits calcula su encriptación.
+   * @param[in] input Buffer de entrada.
+   * @param[out] output Buffer donde guardar el resultado.
+   */
+  void EncryptBlock(const uint8_t input[16], uint8_t output[16]);
 
-  void DecryptBlock(const unsigned char input[16], unsigned char output[16]);
+  /**
+   * @brief Dado un bloque de 128 bits calcula su desencriptación.
+   * @param[in] input Buffer de entrada.
+   * @param[out] output Buffer donde guardar el resultado.
+   */
+  void DecryptBlock(const uint8_t input[16], uint8_t output[16]);
 
   static size_t EncryptedLength(int length);
 
  private:
-  typedef unsigned char uchar;
   KeyLength key_length_;
 
   int rounds_;
 
-  std::vector<uchar> key_ = {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe,
-                             0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81,
-                             0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7,
-                             0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4};
+  std::vector<uint8_t> key_ = {0x60, 0x3d, 0xeb, 0x10, 0x15, 0xca, 0x71, 0xbe,
+                               0x2b, 0x73, 0xae, 0xf0, 0x85, 0x7d, 0x77, 0x81,
+                               0x1f, 0x35, 0x2c, 0x07, 0x3b, 0x61, 0x08, 0xd7,
+                               0x2d, 0x98, 0x10, 0xa3, 0x09, 0x14, 0xdf, 0xf4};
 
   // Es de tipo vector porque hasta que se crea la instancia, no se puede la
   // cantidad de claves necesarias y así se evita reservar memoria extra.
-  std::vector<uchar> expanded_key_;
+  std::vector<uint8_t> expanded_key_;
 
-  std::array<uchar, 16> rcon_ = {1, 0, 0, 0};
+  std::array<uint8_t, 16> rcon_ = {1, 0, 0, 0};
 
-  std::array<uchar, 16> state_;
+  std::array<uint8_t, 16> state_;
 
-  const std::array<uchar, 256> s_box_ = {
+  const std::array<uint8_t, 256> s_box_ = {
       0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b,
       0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
       0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0, 0xb7, 0xfd, 0x93, 0x26,
@@ -79,7 +106,7 @@ class AES {
       0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f,
       0xb0, 0x54, 0xbb, 0x16};
 
-  const std::array<uchar, 256> inverse_s_box_ = {
+  const std::array<uint8_t, 256> inverse_s_box_ = {
       0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e,
       0x81, 0xf3, 0xd7, 0xfb, 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87,
       0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb, 0x54, 0x7b, 0x94, 0x32,
@@ -126,7 +153,7 @@ class AES {
    * @param[out] row Array que se rotará.
    * @param[in] offset Desplazamiento.
    */
-  void ShiftRow(uchar* row, int offset) const;
+  void ShiftRow(uint8_t* row, int offset) const;
 
   /**
    * @brief Multiplica cada columna de la matriz de estado por una matriz
@@ -148,7 +175,7 @@ class AES {
    *        https://crypto.stackexchange.com/questions/71204/how-are-these-aes-mixcolumn-multiplication-tables-calculated
    * @param[out] column Columna que se multiplicará.
    */
-  void MixColumn(uchar* column) const;
+  void MixColumn(uint8_t* column) const;
 
   /**
    * @brief Multiplica cada columna de la matriz de estado por la matriz inversa
@@ -161,7 +188,7 @@ class AES {
    * Igual que en MixColumns, las operaciones están dentro de GF(2^8).
    * @param[out] column Columna que se multiplicará.
    */
-  void InverseMixColumn(uchar* column) const;
+  void InverseMixColumn(uint8_t* column) const;
 
   /**
    * @brief Hace un xor ente la clave correspondiente a la ronda actual y el
@@ -182,7 +209,7 @@ class AES {
    * @param[in] c Array 2.
    * @param[in] size Tamaño de los arrays.
    */
-  void Xor(uchar* a, const uchar* b, const uchar* c, int size = 4) const;
+  void Xor(uint8_t* a, const uint8_t* b, const uint8_t* c, int size = 4) const;
 
   /**
    * @brief Sustituye el caracter pasado por parámetro por su correspondiente en
@@ -190,7 +217,7 @@ class AES {
    * @param[in] index Caracter a sustituir.
    * @return Caracter sustituido.
    */
-  inline unsigned char GetSubByte(uchar index) const;
+  inline uint8_t GetSubByte(uint8_t index) const;
 
   /**
    * @brief Sustituye el caracter pasado por parámetro por su correspondiente en
@@ -198,14 +225,14 @@ class AES {
    * @param[in] index Caracter a sustituir.
    * @return Caracter sustituido.
    */
-  inline unsigned char GetInverseSubByte(uchar index) const;
+  inline uint8_t GetInverseSubByte(uint8_t index) const;
 
   /**
    * @brief Duplicación dentro de GF(2^8).
    * @param[in] a Número a multiplicar.
    * @return Resultado de la multiplicación.
    */
-  inline unsigned char dbl(uchar a) const;
+  inline uint8_t dbl(uint8_t a) const;
 
   /**
    * @brief Convierte una matriz guardada por filas a una guardada por columnas
@@ -213,6 +240,6 @@ class AES {
    * @param[in] input Matriz a rotar.
    * @param[out] output Dirección de memoria donde guardar la nueva memoria.
    */
-  static void RotateMatrix(const uchar* input, uchar* output);
+  static void RotateMatrix(const uint8_t* input, uint8_t* output);
 };
 #endif

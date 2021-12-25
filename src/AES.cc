@@ -1,6 +1,22 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * AES.cc: Implementación de la clase AES, encargada de cifrar simétricamente de
+ *         acuerdo con el estandar AES. Admite claves de 128, 192 o 256 bits.
+ * @ref https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf
+ * Revision history:
+ *                22/12/2021 - Creación (primera versión) del código
+ */
+
 #include "AES.h"
 
-AES::AES(KeyLength key_length) : key_length_{key_length} {
+AES::AES(KeyLength key_length, uint8_t* key) : key_length_{key_length} {
   switch (key_length_) {
     case AES_128:
       rounds_ = 10;
@@ -12,20 +28,21 @@ AES::AES(KeyLength key_length) : key_length_{key_length} {
       rounds_ = 14;
       break;
   }
-  expanded_key_.resize((rounds_ + 1) * 16);
-  memcpy(expanded_key_.data(), key_.data(), key_length_);
-  ExpandKey();
+
+  if (key != nullptr) {
+    set_key(key, key_length);
+  } else {
+    expanded_key_.resize((rounds_ + 1) * 16);
+    memcpy(expanded_key_.data(), key_.data(), key_length_);
+    ExpandKey();
+  }
 }
 
 size_t AES::EncryptedLength(int length) {
   return (length / 16) * 16 + (length % 16 > 0) * 16;
 }
 
-/**
- * A todos los bloques se les añade un byte de padding 0x80
- */
-void AES::Encrypt(const unsigned char* input, int length,
-                  unsigned char* output) {
+void AES::Encrypt(const uint8_t* input, int length, uint8_t* output) {
   int pos = 0;
   while (pos + 16 <= length) {
     EncryptBlock(input + pos, output + pos);
@@ -40,10 +57,9 @@ void AES::Encrypt(const unsigned char* input, int length,
   }
 }
 
-void AES::Decrypt(const unsigned char* input, int length,
-                  unsigned char* output) {
+void AES::Decrypt(const uint8_t* input, int length, uint8_t* output) {
   if (length && length % 16 != 0) {
-    throw std::invalid_argument("Eso no está cifrado");
+    throw std::invalid_argument("El input no está cifrado.");
   }
 
   int pos = 0;
@@ -54,7 +70,7 @@ void AES::Decrypt(const unsigned char* input, int length,
   }
 }
 
-void AES::set_key(uchar* key, KeyLength key_length) {
+void AES::set_key(uint8_t* key, KeyLength key_length) {
   key_length_ = key_length;
   if (key_length != key_.size()) {
     key_.resize(key_length);
@@ -68,8 +84,7 @@ inline void AES::AddRoundKey(int iteration) {
   Xor(state_.data(), state_.data(), expanded_key_.data() + iteration * 16, 16);
 }
 
-void AES::EncryptBlock(const unsigned char input[16],
-                       unsigned char output[16]) {
+void AES::EncryptBlock(const uint8_t input[16], uint8_t output[16]) {
   memcpy(state_.data(), input, 16);
   AddRoundKey(0);
 
@@ -93,8 +108,7 @@ void AES::EncryptBlock(const unsigned char input[16],
   memcpy(output, state_.data(), 16);
 }
 
-void AES::DecryptBlock(const unsigned char input[16],
-                       unsigned char output[16]) {
+void AES::DecryptBlock(const uint8_t input[16], uint8_t output[16]) {
   memcpy(state_.data(), input, 16);
 
   AddRoundKey(rounds_ - 1);
@@ -120,7 +134,7 @@ void AES::DecryptBlock(const unsigned char input[16],
 
 void AES::ExpandKey() {
   for (int i = key_length_; i < (rounds_ + 1) * 16; i += key_length_) {
-    uchar* position = expanded_key_.data() + i;
+    uint8_t* position = expanded_key_.data() + i;
     // Se copia la última columna.
     memcpy(position, position - 4, 4);
 
@@ -161,7 +175,7 @@ inline void AES::MixColumns() {
 }
 
 void AES::InverseShiftRows() {
-  std::array<uchar, 16> temp;
+  std::array<uint8_t, 16> temp;
   RotateMatrix(state_.data(), temp.data());
 
   ShiftRow(temp.data() + 4, 3);
@@ -172,7 +186,7 @@ void AES::InverseShiftRows() {
 }
 
 void AES::ShiftRows() {
-  std::array<uchar, 16> temp;
+  std::array<uint8_t, 16> temp;
   RotateMatrix(state_.data(), temp.data());
 
   ShiftRow(temp.data() + 4, 1);
@@ -182,22 +196,20 @@ void AES::ShiftRows() {
   RotateMatrix(temp.data(), state_.data());
 }
 
-void AES::Xor(uchar* a, const uchar* b, const uchar* c, int size) const {
+void AES::Xor(uint8_t* a, const uint8_t* b, const uint8_t* c, int size) const {
   for (int i = 0; i < size; i++) {
     a[i] = b[i] ^ c[i];
   }
 }
 
-inline unsigned char AES::GetSubByte(uchar index) const {
-  return s_box_[index];
-}
+inline uint8_t AES::GetSubByte(uint8_t index) const { return s_box_[index]; }
 
-inline unsigned char AES::GetInverseSubByte(uchar index) const {
+inline uint8_t AES::GetInverseSubByte(uint8_t index) const {
   return inverse_s_box_[index];
 }
 
-void AES::ShiftRow(uchar* row, int offset) const {
-  std::array<uchar, 4> temp;
+void AES::ShiftRow(uint8_t* row, int offset) const {
+  std::array<uint8_t, 4> temp;
   memcpy(temp.data(), row, 4);
 
   for (int i = 0; i < 4; i++) {
@@ -205,7 +217,7 @@ void AES::ShiftRow(uchar* row, int offset) const {
   }
 }
 
-void AES::MixColumn(uchar* column) const {
+void AES::MixColumn(uint8_t* column) const {
   auto c_0 = column[0], c_1 = column[1], c_2 = column[2], c_3 = column[3];
 
   column[0] = dbl(c_0 ^ c_1) ^ c_1 ^ c_2 ^ c_3;
@@ -214,7 +226,7 @@ void AES::MixColumn(uchar* column) const {
   column[3] = dbl(c_3 ^ c_0) ^ c_0 ^ c_1 ^ c_2;
 }
 
-void AES::InverseMixColumn(uchar* column) const {
+void AES::InverseMixColumn(uint8_t* column) const {
   auto c_0 = column[0], c_1 = column[1], c_2 = column[2], c_3 = column[3];
   auto x = dbl(c_0 ^ c_1 ^ c_2 ^ c_3);
   auto y = dbl(x ^ c_0 ^ c_2);
@@ -226,14 +238,11 @@ void AES::InverseMixColumn(uchar* column) const {
   column[3] = dbl(z ^ c_3 ^ c_0) ^ c_0 ^ c_1 ^ c_2;
 }
 
-/**
- * Duplicación dentro de GF(2^8)
- */
-inline unsigned char AES::dbl(uchar a) const {
+inline uint8_t AES::dbl(uint8_t a) const {
   return (a << 1) ^ (0x11b & -(a >> 7));
 }
 
-void AES::RotateMatrix(const uchar* input, uchar* output) {
+void AES::RotateMatrix(const uint8_t* input, uint8_t* output) {
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
       output[(i * 4) + j] = input[(j * 4) + i];

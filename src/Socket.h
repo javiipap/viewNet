@@ -12,19 +12,20 @@
 #define SOCKET_H_
 class Socket {
  public:
+  Socket();
   Socket(sockaddr_in local_address);
 
-  void send_to(const Message& message, const sockaddr_in& address) const;
+  void set_up(sockaddr_in local_address);
 
-  void recieve_from(Message& message, sockaddr_in& address) const;
+  ssize_t send_to(const Message& message, const sockaddr_in& address) const;
 
-  static sockaddr_in make_ip_address(
-      int port, const std::string& ip_address = std::string());
+  ssize_t recieve_from(Message& message, sockaddr_in& address) const;
+
+  static sockaddr_in make_ip_address(int port, const std::string& ip_address = std::string());
 
   ~Socket();
 
  private:
-  int fd_;
-  sockaddr_in local_address_;
+  int fd_ = -2;
 };
 #endif

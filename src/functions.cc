@@ -1,6 +1,6 @@
 #include "functions.h"
 
-sockaddr_in make_ip_address(int port, const std::string& ip_address) {
+sockaddr_in make_ip_address(int port, const std::string &ip_address) {
   in_addr address;
   if (ip_address.length())
     inet_aton(ip_address.c_str(), &address);
@@ -33,4 +33,21 @@ std::string GenerateUid() {
            ((rand() & 0x0fff) | 0x4000), rand() % 0x3fff + 0x8000, rand(), rand(), rand());
 
   return uid;
+}
+
+void sigusr_1_handler(int signo, siginfo_t *info, void *context) { info->si_errno = EINTR; }
+
+void set_signals() {
+  sigset_t set;
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGHUP);
+  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+
+  struct sigaction sigusr_1_action = {0};
+
+  sigusr_1_action.sa_flags = SA_SIGINFO;
+  sigusr_1_action.sa_sigaction = &sigusr_1_handler;
+
+  sigaction(SIGUSR1, &sigusr_1_action, nullptr);
 }

@@ -7,7 +7,7 @@
 
 class Message {
  public:
-  std::array<char, MESSAGESIZE> text;
+  std::array<uint8_t, MESSAGESIZE> text;
   int chunk_size = 0;
 };
 

@@ -1,7 +1,8 @@
-PROGNAME   = viewNet
-CC       = g++
-CFLAGS   = -std=c++2a -Wall
-LINKER   = g++
+PROGNAME    = viewNet
+CC          = g++
+CFLAGS      = -std=c++2a -Wall
+LINKER      = g++
+LINKERFLAGS = -pthread
 
 SRCDIR   = src
 OBJDIR   = obj
@@ -15,7 +16,7 @@ TESTS_SRC := $(patsubst $(TESTDIR)/%.cc, $(TESTDIR)/%.o, $(wildcard $(TESTDIR)/*
 $(PROGNAME): $(SRC)
 	@mkdir -p $(BINDIR)
 	@echo $(SRC)
-	@$(LINKER) $(CFLAGS) $(SRC) -o $(BINDIR)/$(PROGNAME)
+	@$(LINKER) $(CFLAGS) $(LINKERFLAGS) $(SRC) -o $(BINDIR)/$(PROGNAME)
 	@echo "Linking complete!"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cc
@@ -30,7 +31,7 @@ tests: $(TESTS_SRC)
 $(TESTDIR)/%.o: $(LIB_SRC)
 	@mkdir -p $(BINDIR)/tests
 	@$(CC) $(CFLAGS) -g -c $(patsubst $(TESTDIR)/%.o, $(TESTDIR)/%.cc, $@) -o $(patsubst $(TESTDIR)/%.o, $(OBJDIR)/%.o, $@)
-	@$(LINKER) $(CFLAGS) -o $(patsubst $(TESTDIR)/%.o, $(BINDIR)/tests/%, $@) $(patsubst $(TESTDIR)/%.o, $(OBJDIR)/%.o, $@) $(LIB_SRC)
+	@$(LINKER) $(LINKERFLAGS) $(CFLAGS) -o $(patsubst $(TESTDIR)/%.o, $(BINDIR)/tests/%, $@) $(patsubst $(TESTDIR)/%.o, $(OBJDIR)/%.o, $@) $(LIB_SRC)
 
 clean:
 	rm -rf $(OBJDIR)/*

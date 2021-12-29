@@ -23,3 +23,14 @@ std::string extract_string(Message message) {
 
   return result;
 }
+
+std::string DecodeAction() { return ""; }
+
+std::string GenerateUid() {
+  char uid[61];
+  srand(time(NULL));
+  snprintf(uid, sizeof(uid), "%x%x-%x-%x-%x-%x%x%x", rand(), rand(), rand(),
+           ((rand() & 0x0fff) | 0x4000), rand() % 0x3fff + 0x8000, rand(), rand(), rand());
+
+  return uid;
+}

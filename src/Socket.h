@@ -17,7 +17,7 @@ class Socket {
 
   void set_up(sockaddr_in local_address);
 
-  ssize_t send_to(const Message& message, const sockaddr_in& address) const;
+  ssize_t send_to(const Message& message, const sockaddr_in& address);
 
   ssize_t recieve_from(Message& message, sockaddr_in& address) const;
 
@@ -27,5 +27,6 @@ class Socket {
 
  private:
   int fd_ = -2;
+  pthread_mutex_t mutex_;
 };
 #endif

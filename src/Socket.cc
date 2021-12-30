@@ -21,9 +21,11 @@ void Socket::set_up(sockaddr_in local_address) {
   }
 }
 
-ssize_t Socket::send_to(const Message& message, const sockaddr_in& address) const {
+ssize_t Socket::send_to(const Message& message, const sockaddr_in& address) {
+  pthread_mutex_lock(&mutex_);
   int res = sendto(fd_, &message, sizeof(message), 0, reinterpret_cast<const sockaddr*>(&address),
                    sizeof(address));
+  pthread_mutex_unlock(&mutex_);
   if (res < 0) {
     throw std::runtime_error("Fallo al enviar el mensaje.");
   }

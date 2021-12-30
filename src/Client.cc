@@ -10,9 +10,9 @@ void Client::request(server_action action, std::string param) {
   socket_.send_to(buffer, server_address_);
 
   bool end_found = false;
-
+  sockaddr_in worker_addr;
   while (!end_found) {
-    socket_.recieve_from(buffer, server_address_);
+    socket_.recieve_from(buffer, worker_addr);
     for (int i = 0; i < buffer.chunk_size; i++) {
       std::cout << buffer.text[i];
 

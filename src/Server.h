@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -25,49 +26,43 @@ class Server {
   void abort();
   void pause();
   void resume();
+  void info();
 
  private:
   struct thread_info {
     pthread_t fd;
     std::string uuid;
-    std::string type;
+    server_action type;
     void* args = nullptr;
   };
 
   struct get_file_args {
     const std::string& filename;
-    Socket& server_socket;
     sockaddr_in& client_addr;
-    AES& aes;
-    pthread_mutex_t& aes_mutex;
+    const thread_info& self;
+    Server* instance;
   };
 
   struct list_args {
-    Socket& server_socket;
     sockaddr_in& client_addr;
-    AES& aes;
-    pthread_mutex_t& aes_mutex;
+    const thread_info& self;
+    Server* instance;
   };
 
   struct main_thread_args {
-    Socket& socket;
     int port;
     std::vector<thread_info>& threads;
     pthread_mutex_t& stop_server_mutex_;
     AES& aes;
     pthread_mutex_t& aes_mutex;
-  };
-
-  struct prueba {
-    int port;
-    int algo;
+    Server* instance;
   };
 
   AES aes_ = {AES::AES_256};
-  Socket socket_;
   std::vector<thread_info> internal_threads_;
   pthread_mutex_t stop_server_mutex_ = pthread_mutex_t();
   pthread_mutex_t aes_mutex_ = pthread_mutex_t();
+  pthread_mutex_t threads_vector_mutex_ = pthread_mutex_t();
   int port_;
   thread_info main_thread_;
 
@@ -75,6 +70,8 @@ class Server {
   static void* get_file(void* args);
   static void* list(void* args);
 
-  static void delete_internal_threads(std::vector<thread_info>& threads);
+  void delete_self(std::string uuid);
+
+  void delete_internal_threads();
 };
 #endif

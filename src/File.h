@@ -31,9 +31,9 @@ class File {
 
   ~File();
 
-  ssize_t read(void* buf, size_t size);
+  size_t read(void* buf, size_t size);
 
-  ssize_t write(void* buf, size_t size);
+  size_t write(void* buf, size_t size);
 
   int size() const;
 

@@ -36,15 +36,17 @@ class Server {
 
   struct get_file_args {
     const std::string& filename;
-    const Socket& server_socket;
+    Socket& server_socket;
     sockaddr_in& client_addr;
     AES& aes;
+    pthread_mutex_t& aes_mutex;
   };
 
   struct list_args {
-    const Socket& server_socket;
+    Socket& server_socket;
     sockaddr_in& client_addr;
     AES& aes;
+    pthread_mutex_t& aes_mutex;
   };
 
   struct main_thread_args {
@@ -53,6 +55,7 @@ class Server {
     std::vector<thread_info>& threads;
     pthread_mutex_t& stop_server_mutex_;
     AES& aes;
+    pthread_mutex_t& aes_mutex;
   };
 
   struct prueba {
@@ -64,11 +67,11 @@ class Server {
   Socket socket_;
   std::vector<thread_info> internal_threads_;
   pthread_mutex_t stop_server_mutex_ = pthread_mutex_t();
+  pthread_mutex_t aes_mutex_ = pthread_mutex_t();
   int port_;
   thread_info main_thread_;
 
   static void* main_thread(void* args);
-
   static void* get_file(void* args);
   static void* list(void* args);
 

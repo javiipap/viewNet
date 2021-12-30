@@ -15,14 +15,14 @@ void* Server::get_file(void* args) {
   int position = 0;
   int chunk = 1;
   Message msg;
-  File file(filename);
+  File file("public/" + filename);
 
   while (((chunk - 1) * MESSAGESIZE) < file.size()) {
     position = file.read(&msg.text, MESSAGESIZE);
     if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE != 0) {
       msg.text[position % MESSAGESIZE] = '\0';
     }
-
+    msg.chunk_size = position + 1;
     // pthread_mutex_lock(&aes_mutex);
     // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
     // pthread_mutex_unlock(&aes_mutex);
@@ -30,11 +30,13 @@ void* Server::get_file(void* args) {
 
     if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE == 0) {
       msg.text[0] = '\0';
+      msg.chunk_size = 1;
       server_socket.send_to(msg, client_addr);
     }
     chunk++;
   }
 
+  // TODO: Eliminar thread del registro.
   return nullptr;
 }
 
@@ -89,7 +91,7 @@ void* Server::list(void* args) {
 
     server_socket.send_to(msg, client_addr);
   }
-
+  // Eliminar thread del registro.
   return nullptr;
 }
 
@@ -109,10 +111,11 @@ void Server::listen(int port) {
 }
 
 void* Server::main_thread(void* args) {
+  auto [socket, port, threads, stop_server_mutex, aes, aes_mutex] =
+      *static_cast<main_thread_args*>(args);
+
   try {
-    auto [socket, port, threads, stop_server_mutex, aes, aes_mutex] =
-        *static_cast<main_thread_args*>(args);
-    auto server_addr = Socket::make_ip_address(port);
+    auto server_addr = make_ip_address(port);
     Message msg;
     struct sockaddr_in client_addr {};
     ssize_t read_bytes = 0;
@@ -130,22 +133,30 @@ void* Server::main_thread(void* args) {
       }
 
       pthread_mutex_lock(&stop_server_mutex);
-
-      threads.push_back({pthread_t(), GenerateUid(), nullptr});
-      if (msg.text[0] == 'a') {
-        threads.back().args = new get_file_args{extract_string(msg), std::ref(socket), client_addr,
-                                                std::ref(aes), std::ref(aes_mutex)};
+      std::string param;
+      auto action = DecodeAction(msg, &param);
+      threads.push_back({pthread_t(), GenerateUid(), "", nullptr});
+      if (action == server_action::get_file) {
+        threads.back().args = new get_file_args{param, std::ref(socket), client_addr, std::ref(aes),
+                                                std::ref(aes_mutex)};
         threads.back().type = "get";
-        pthread_create(&threads.back().fd, nullptr, get_file, args);
-      } else {
+        pthread_create(&threads.back().fd, nullptr, get_file, threads.back().args);
+      } else if (action == server_action::list_files) {
         threads.back().args =
             new list_args{std::ref(socket), client_addr, std::ref(aes), std::ref(aes_mutex)};
         threads.back().type = "list";
-        pthread_create(&threads.back().fd, nullptr, list, args);
+        pthread_create(&threads.back().fd, nullptr, list, threads.back().args);
+      } else {
+        std::cout << "Te mamaste" << std::endl;
       }
     }
-  } catch (...) {
-    std::cerr << "[SERVER]: Critical error: " << errno << std::endl;
+  } catch (std::invalid_argument& err) {
+    std::cout << err.what() << std::endl;
+    delete_internal_threads(threads);
+    return nullptr;
+  } catch (std::exception& err) {
+    std::cerr << "[SERVER]: Critical error: " << err.what() << std::endl;
+    delete_internal_threads(threads);
     return nullptr;
   }
 }

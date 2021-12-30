@@ -20,12 +20,15 @@ int main(int argc, char *argv[]) {
       std::cout << "Puerto de escucha: ";
       std::cin >> user_input;
       server.listen(stoi(user_input));
+      client.set_up(make_ip_address(stoi(user_input)));
     } else if (user_input == "server_off") {
       server.stop();
     } else if (user_input == "get") {
-      client.get();
+      std::cout << "Nombre del fichero: ";
+      std::cin >> user_input;
+      client.request(server_action::get_file, user_input);
     } else if (user_input == "list") {
-      client.list();
+      client.request(server_action::list_files);
     } else if (user_input == "abort") {
       server.abort();
       client.abort();

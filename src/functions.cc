@@ -24,7 +24,7 @@ std::string extract_string(Message message) {
   return result;
 }
 
-void EncodeAction(Message& buffer, server_action action, std::string param) {
+void EncodeAction(Message& buffer, server_action action, const std::string param) {
   for (int i = 0; i < 6; i++) {
     buffer.text[i] = 0;
   }
@@ -59,6 +59,17 @@ server_action DecodeAction(const Message& buffer, std::string* param) {
   return casted_action;
 }
 
+bool starts_with(std::string haystack, std::string needle) {
+  if (needle.size() > haystack.size()) return false;
+
+  for (int i = 0; i < needle.size(); i++) {
+    if (haystack[i] != needle[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string GenerateUid() {
   std::string uuid;
   uuid.resize(UUID_LENGTH);
@@ -69,19 +80,70 @@ std::string GenerateUid() {
   return uuid;
 }
 
+std::vector<std::string> split(const std::string& s) {
+  std::stringstream ss(s);
+  std::vector<std::string> words;
+
+  while (!ss.eof()) {
+    std::string word;
+    ss >> word;
+    words.push_back(word);
+  }
+
+  return words;
+}
+
 void sigusr_1_handler(int signo, siginfo_t* info, void* context) { info->si_errno = EINTR; }
 
+void sigusr_2_handler(int signo, siginfo_t* info, void* context) {
+  if (info->si_errno == 128) {
+    info->si_errno = 0;
+    return;
+  };
+  info->si_errno = 128;
+  pause();
+}
+
+void quit_handler(int signo, siginfo_t* info, void* context) {
+  std::cout << "hola " << std::endl;
+  info->si_errno = EINTR;
+}
+
+void* signal_handler(void* args) {
+  struct sigaction quit_action = {0};
+
+  quit_action.sa_sigaction = &quit_handler;
+  quit_action.sa_flags = 0;
+
+  sigaction(SIGINT, &quit_action, nullptr);
+  sigaction(SIGTERM, &quit_action, nullptr);
+  sigaction(SIGHUP, &quit_action, nullptr);
+
+  return nullptr;
+}
+
 void set_signals() {
+  pthread_t signal_handler_thread = pthread_t();
+  pthread_create(&signal_handler_thread, nullptr, signal_handler, nullptr);
+  pthread_detach(signal_handler_thread);
+
   sigset_t set;
   sigaddset(&set, SIGINT);
   sigaddset(&set, SIGTERM);
   sigaddset(&set, SIGHUP);
-  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+  // pthread_sigmask(SIG_BLOCK, &set, nullptr);
 
-  struct sigaction sigusr_1_action = {0};
+  struct sigaction sigterm_action = {0};
 
-  sigusr_1_action.sa_flags = SA_SIGINFO;
-  sigusr_1_action.sa_sigaction = &sigusr_1_handler;
+  sigterm_action.sa_flags = SA_SIGINFO;
+  sigterm_action.sa_sigaction = &sigusr_1_handler;
 
-  sigaction(SIGUSR1, &sigusr_1_action, nullptr);
+  sigaction(SIGUSR1, &sigterm_action, nullptr);
+
+  struct sigaction sigusr_action = {0};
+
+  sigterm_action.sa_flags = 0;
+  sigterm_action.sa_sigaction = &sigusr_2_handler;
+
+  sigaction(SIGUSR2, &sigusr_action, nullptr);
 }

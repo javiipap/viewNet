@@ -120,7 +120,6 @@ void Server::listen(int port) {
   main_thread_.fd = pthread_t();
   main_thread_.args = this;
   pthread_create(&main_thread_.fd, nullptr, main_thread, this);
-  std::cout << "[SERVER]: Listening on port " << port << std::endl;
 }
 
 void* Server::main_thread(void* args) {
@@ -128,6 +127,7 @@ void* Server::main_thread(void* args) {
   try {
     auto server_addr = make_ip_address(instance->port_);
     Socket socket(server_addr);
+    std::cout << "[SERVER]: Listening on port " << instance->port_ << std::endl;
     Message msg;
     struct sockaddr_in client_addr {};
     ssize_t read_bytes = 0;

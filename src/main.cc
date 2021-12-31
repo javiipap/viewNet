@@ -17,16 +17,16 @@ int main(int argc, char *argv[]) {
   while (true) {
     std::cout << "viewNet $> ";
 
-    try {
-      getline(std::cin, user_input);
-    } catch (...) {
-      std::cerr << "Exit" << std::endl;
-      return 1;
+    std::cin.clear();  // Clear flags
+
+    getline(std::cin, user_input);
+    if (errno == EINTR) {
+      return 0;
     }
 
     if (starts_with(user_input, "server on")) {
       auto args = split(user_input);
-      int port = 0;
+      int port = 5000;
       if (args.size() > 2) {
         port = stoi(args[2]);
       }

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include "AES.h"
@@ -65,6 +66,7 @@ class Server {
   pthread_mutex_t threads_vector_mutex_ = pthread_mutex_t();
   int port_;
   thread_info main_thread_;
+  std::unordered_map<std::string, std::string> files_sha256_;
 
   static void* main_thread(void* args);
   static void* get_file(void* args);

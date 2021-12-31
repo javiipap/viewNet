@@ -18,26 +18,35 @@ void* Server::get_file(void* args) {
   Socket socket(make_ip_address(0));
   int size = 0;
 
+  EncodeAction(msg, server_action::retrieve_uuid, self.uuid);
+  msg.end_of_mesage = true;
+  socket.send_to(msg, client_addr);
+  msg.end_of_mesage = false;
+
   while (((chunk - 1) * MESSAGESIZE) < file.size()) {
     position = file.read(&msg.text, MESSAGESIZE);
     size += position;
+
     if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE != 0) {
-      msg.text[position % MESSAGESIZE] = '\0';
+      msg.text[position % MESSAGESIZE] = 0;
+      msg.end_of_mesage = true;
     }
     msg.chunk_size = position + 1;
     // pthread_mutex_lock(&aes_mutex);
     // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
     // pthread_mutex_unlock(&aes_mutex);
-    ssize_t sent_bytes = socket.send_to(msg, client_addr);
+    socket.send_to(msg, client_addr);
 
     if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE == 0) {
-      msg.text[0] = '\0';
+      msg.text[0] = 0;
       msg.chunk_size = 1;
+      msg.end_of_mesage = true;
       socket.send_to(msg, client_addr);
     }
     chunk++;
   }
-  std::cout << "[SERVER]: Sent " << filename << " successfully (" << size << " bytes)" << std::endl;
+  std::cout << "[SERVER] (" << self.uuid.substr(0, 4) << "): Sent " << filename << " successfully ("
+            << size << " bytes)" << std::endl;
   instance->delete_self(self.uuid);
   return nullptr;
 }
@@ -49,6 +58,11 @@ void* Server::list(void* args) {
   bool terminated = false;
   Socket socket(make_ip_address(0));
   Message msg;
+
+  EncodeAction(msg, server_action::retrieve_uuid, self.uuid);
+  msg.end_of_mesage = true;
+  socket.send_to(msg, client_addr);
+  msg.end_of_mesage = false;
 
   while ((dir_file = readdir(dir)) != nullptr) {
     int i = 0;
@@ -73,6 +87,7 @@ void* Server::list(void* args) {
 
   if (msg.chunk_size + 1 < MESSAGESIZE) {
     msg.text[msg.chunk_size++] = 0;
+    msg.end_of_mesage = true;
     // pthread_mutex_lock(&aes_mutex);
     // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
     // pthread_mutex_unlock(&aes_mutex);
@@ -85,6 +100,7 @@ void* Server::list(void* args) {
   if (!terminated) {
     msg.text[0] = 0;
     msg.chunk_size = 1;
+    msg.end_of_mesage = true;
     // pthread_mutex_lock(&aes_mutex);
     // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
     // pthread_mutex_unlock(&aes_mutex);
@@ -92,7 +108,7 @@ void* Server::list(void* args) {
     socket.send_to(msg, client_addr);
   }
 
-  std::cout << "[SERVER]: Sent directory list." << std::endl;
+  std::cout << "[SERVER] (" << self.uuid.substr(0, 4) << "): Sent directory list." << std::endl;
   closedir(dir);
   instance->delete_self(self.uuid);
   return nullptr;
@@ -132,6 +148,8 @@ void* Server::main_thread(void* args) {
       auto action = DecodeAction(msg, &param);
       pthread_mutex_lock(&instance->threads_vector_mutex_);
       instance->internal_threads_.push_back({pthread_t(), GenerateUid(), action, nullptr});
+      std::cout << "[SERVER]: Starting task (" << instance->internal_threads_.back().uuid << ")"
+                << std::endl;
       switch (action) {
         case server_action::get_file: {
           instance->internal_threads_.back().args =
@@ -152,10 +170,6 @@ void* Server::main_thread(void* args) {
       }
       pthread_mutex_unlock(&instance->threads_vector_mutex_);
     }
-  } catch (std::invalid_argument& err) {
-    std::cout << err.what() << std::endl;
-    instance->delete_internal_threads();
-    return nullptr;
   } catch (std::exception& err) {
     std::cerr << "[SERVER]: Critical error: " << err.what() << std::endl;
     instance->delete_internal_threads();
@@ -196,6 +210,7 @@ void Server::delete_internal_threads() {
 }
 
 void Server::delete_self(std::string uuid) {
+  std::cout << "[SERVER]: Closing task (" << uuid << ")" << std::endl;
   pthread_mutex_lock(&threads_vector_mutex_);
   for (int i = 0; i < internal_threads_.size(); i++) {
     if (internal_threads_[i].uuid == uuid) {

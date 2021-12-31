@@ -8,9 +8,10 @@
 class Client {
  public:
   Client();
+  ~Client();
   void set_up(sockaddr_in server_address);
   void request(server_action action, std::string param = "");
-  void abort();
+  void abort(std::string uuid);
   void pause();
   void resume();
 
@@ -18,15 +19,25 @@ class Client {
   struct thread_info {
     pthread_t fd;
     std::string uuid;
-    server_action type;
+    std::string server_task_uuid;
     void* args = nullptr;
   };
 
-  Socket socket_ = Socket(make_ip_address(0, "127.0.0.1"));
+  struct thread_args {
+    server_action action;
+    std::string param;
+    thread_info& self;
+    Client* instance;
+  };
+
   sockaddr_in server_address_;
   AES aes_ = AES(AES::AES_256);
-  std::vector<thread_info> threads;
+  std::vector<thread_info> threads_;
+  pthread_mutex_t threads_mutex_ = pthread_mutex_t();
 
-  void* internal_handler(void* args);
+  static void* internal_handler(void* args);
+
+  void delete_self(std::string uuid);
+  void delete_internal_threads();
 };
 #endif

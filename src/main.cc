@@ -10,32 +10,41 @@ int main(int argc, char *argv[]) {
 
   Server server = Server();
   Client client = Client();
-
+  client.set_up(make_ip_address(5555));
   std::cout << "Bienvenido a viewNet\n";
   std::cout << std::flush;
+
   while (true) {
-    std::cout << "viewNet: ";
-    std::cin >> user_input;
-    if (user_input == "server_on") {
-      std::cout << "Puerto de escucha: ";
-      std::cin >> user_input;
-      server.listen(stoi(user_input));
-      client.set_up(make_ip_address(stoi(user_input)));
-    } else if (user_input == "server_off") {
+    std::cout << "viewNet $> ";
+
+    try {
+      getline(std::cin, user_input);
+    } catch (...) {
+      std::cerr << "Exit" << std::endl;
+      return 1;
+    }
+
+    if (starts_with(user_input, "server on")) {
+      auto args = split(user_input);
+      int port = 0;
+      if (args.size() > 2) {
+        port = stoi(args[2]);
+      }
+      server.listen(port);
+    } else if (user_input == "server off") {
       server.stop();
-    } else if (user_input == "get") {
-      std::cout << "Nombre del fichero: ";
-      std::cin >> user_input;
-      client.request(server_action::get_file, user_input);
+    } else if (starts_with(user_input, "get")) {
+      client.request(server_action::get_file, split(user_input)[1]);
     } else if (user_input == "list") {
       client.request(server_action::list_files);
     } else if (user_input == "abort") {
-      server.abort();
-      client.abort();
+      // client.abort();
     } else if (user_input == "pause") {
       server.pause();
     } else if (user_input == "resume") {
       server.resume();
+    } else if (user_input == "info") {
+      server.info();
     } else if (user_input == "exit") {
       break;
     } else {

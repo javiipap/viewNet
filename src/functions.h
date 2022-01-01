@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <vector>
 
@@ -23,8 +24,7 @@ enum server_action {
   list_files,
   get_file = WITH_PARAM_ACTION | 0,
   abortar = WITH_PARAM_ACTION | 1,
-  pausar = WITH_PARAM_ACTION | 2,
-  resume = WITH_PARAM_ACTION | 3,
+  pause_resume = WITH_PARAM_ACTION | 2,
   retrieve_uuid = WITH_PARAM_ACTION | 4
 };
 
@@ -32,17 +32,21 @@ sockaddr_in make_ip_address(int port, const std::string& ip_address = std::strin
 
 std::string extract_string(const Message message);
 
+void* cli(void* args);
+
 bool starts_with(const std::string haystack, const std::string needle);
 
 void EncodeAction(Message& buffer, server_action action, const std::string param = "");
 
 server_action DecodeAction(const Message& buffer, std::string* param = nullptr);
 
-std::string GenerateUid();
+std::string generate_uuid();
 
 std::vector<std::string> split(const std::string& s);
 
 void sigusr_1_handler(int signo, siginfo_t* info, void* context);
+
+void sigusr_handler(int signo, siginfo_t* info, void* context);
 
 void set_signals();
 

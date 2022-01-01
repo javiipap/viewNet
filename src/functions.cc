@@ -70,14 +70,22 @@ bool starts_with(std::string haystack, std::string needle) {
   return true;
 }
 
-std::string GenerateUid() {
-  std::string uuid;
-  uuid.resize(UUID_LENGTH);
-  srand(time(NULL));
-  snprintf(uuid.data(), uuid.size(), "%x%x-%x-%x-%x-%x%x%x", rand(), rand(), rand(),
-           ((rand() & 0x0fff) | 0x4000), rand() % 0x3fff + 0x8000, rand(), rand(), rand());
+std::string generate_uuid() {
+  static std::random_device dev;
+  static std::mt19937 rng(dev());
 
-  return uuid;
+  std::uniform_int_distribution<int> dist(0, 15);
+
+  const char* v = "0123456789abcdef";
+  const bool dash[] = {0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0};
+
+  std::string res;
+  for (int i = 0; i < 16; i++) {
+    if (dash[i]) res += "-";
+    res += v[dist(rng)];
+    res += v[dist(rng)];
+  }
+  return res;
 }
 
 std::vector<std::string> split(const std::string& s) {
@@ -95,55 +103,19 @@ std::vector<std::string> split(const std::string& s) {
 
 void sigusr_1_handler(int signo, siginfo_t* info, void* context) { info->si_errno = EINTR; }
 
-void sigusr_2_handler(int signo, siginfo_t* info, void* context) {
-  if (info->si_errno == 128) {
-    info->si_errno = 0;
-    return;
-  };
-  info->si_errno = 128;
-  pause();
-}
-
-void quit_handler(int signo, siginfo_t* info, void* context) {
-  std::cout << "hola " << std::endl;
-  info->si_errno = EINTR;
-}
-
-void* signal_handler(void* args) {
-  struct sigaction quit_action = {0};
-
-  quit_action.sa_sigaction = &quit_handler;
-  quit_action.sa_flags = 0;
-
-  sigaction(SIGINT, &quit_action, nullptr);
-  sigaction(SIGTERM, &quit_action, nullptr);
-  sigaction(SIGHUP, &quit_action, nullptr);
-
-  return nullptr;
-}
-
-void set_signals() {
-  pthread_t signal_handler_thread = pthread_t();
-  pthread_create(&signal_handler_thread, nullptr, signal_handler, nullptr);
-  pthread_detach(signal_handler_thread);
-
-  sigset_t set;
-  sigaddset(&set, SIGINT);
-  sigaddset(&set, SIGTERM);
-  sigaddset(&set, SIGHUP);
-  // pthread_sigmask(SIG_BLOCK, &set, nullptr);
-
-  struct sigaction sigterm_action = {0};
-
-  sigterm_action.sa_flags = SA_SIGINFO;
-  sigterm_action.sa_sigaction = &sigusr_1_handler;
-
-  sigaction(SIGUSR1, &sigterm_action, nullptr);
-
-  struct sigaction sigusr_action = {0};
-
-  sigterm_action.sa_flags = 0;
-  sigterm_action.sa_sigaction = &sigusr_2_handler;
-
-  sigaction(SIGUSR2, &sigusr_action, nullptr);
+void sigusr_handler(int signo, siginfo_t* info, void* context) {
+  std::cout << signo << std::endl;
+  std::cout << info->si_errno << std::endl;
+  switch (signo) {
+    case SIGUSR1:
+      info->si_errno = EINTR;
+      return;
+    case SIGUSR2:
+      if (info->si_errno == 128) {
+        info->si_errno = 0;
+        return;
+      };
+      info->si_errno = 128;
+      pause();
+  }
 }

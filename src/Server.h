@@ -4,6 +4,7 @@
 #include <signal.h>
 
 #include <algorithm>
+#include <atomic>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -24,29 +25,26 @@ class Server {
 
   void stop();
 
-  void abort();
-  void pause();
-  void resume();
   void info();
 
  private:
   struct thread_info {
     pthread_t fd;
-    std::string uuid;
     server_action type;
+    std::atomic<bool> stop = false;
     void* args = nullptr;
   };
 
   struct get_file_args {
     const std::string& filename;
     sockaddr_in& client_addr;
-    const thread_info& self;
+    std::string uuid;
     Server* instance;
   };
 
-  struct list_args {
+  struct general_args {
     sockaddr_in& client_addr;
-    const thread_info& self;
+    std::string uuid;
     Server* instance;
   };
 
@@ -60,7 +58,7 @@ class Server {
   };
 
   AES aes_ = {AES::AES_256};
-  std::vector<thread_info> internal_threads_;
+  std::unordered_map<std::string, thread_info> internal_threads_;
   pthread_mutex_t stop_server_mutex_ = pthread_mutex_t();
   pthread_mutex_t aes_mutex_ = pthread_mutex_t();
   pthread_mutex_t threads_vector_mutex_ = pthread_mutex_t();
@@ -71,6 +69,8 @@ class Server {
   static void* main_thread(void* args);
   static void* get_file(void* args);
   static void* list(void* args);
+
+  static void* pause_resume(void* args);
 
   void delete_self(std::string uuid);
 

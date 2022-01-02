@@ -3,12 +3,10 @@
 #include "Server.h"
 #include "functions.h"
 
-int main() {
-  sigset_t set;
-  sigaddset(&set, SIGINT);
-  sigaddset(&set, SIGTERM);
-  sigaddset(&set, SIGHUP);
-  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+pthread_t main_thread = pthread_t();
+
+void* cli(void* args) {
+  main_output* output = new main_output{0};
 
   struct sigaction sigterm_action = {0};
 
@@ -32,7 +30,8 @@ int main() {
 
     getline(std::cin, user_input);
     if (errno == EINTR) {
-      return 1;
+      client.stop();
+      return output;
     }
 
     if (starts_with(user_input, "server on")) {
@@ -87,5 +86,22 @@ int main() {
     }
   }
 
-  return 0;
+  return output;
+}
+
+int main() {
+  sigset_t set;
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGHUP);
+  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+
+  pthread_create(&main_thread, nullptr, &cli, nullptr);
+
+  pthread_t exit_handler_thread = pthread_t();
+  pthread_create(&exit_handler_thread, nullptr, &exit_handler, nullptr);
+  pthread_detach(exit_handler_thread);
+
+  pthread_join(main_thread, nullptr);
 }

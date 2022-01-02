@@ -101,8 +101,6 @@ std::vector<std::string> split(const std::string& s) {
   return words;
 }
 
-void sigusr_1_handler(int signo, siginfo_t* info, void* context) { info->si_errno = EINTR; }
-
 void sigusr_handler(int signo, siginfo_t* info, void* context) {
   switch (signo) {
     case SIGUSR1:
@@ -113,4 +111,17 @@ void sigusr_handler(int signo, siginfo_t* info, void* context) {
       info->si_errno = EINTR;
       return;
   }
+}
+
+void* exit_handler(void* args) {
+  sigset_t set;
+  sigemptyset(&set);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGINT);
+  int signum;
+  sigwait(&set, &signum);
+  std::cout << "\nExit forced..." << std::endl;
+  pthread_kill(main_thread, SIGUSR1);
+  return nullptr;
 }

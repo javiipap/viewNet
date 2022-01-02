@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "Message.h"
+extern pthread_t main_thread;
 
 enum server_action {
   unknown = 0,
@@ -28,6 +29,10 @@ enum server_action {
   resumir = WITH_PARAM_ACTION | 3,
   retrieve_uuid = WITH_PARAM_ACTION | 4,
   close_connection = WITH_PARAM_ACTION | 5
+};
+
+struct main_output {
+  int err;
 };
 
 sockaddr_in make_ip_address(int port, const std::string& ip_address = std::string());
@@ -46,10 +51,8 @@ std::string generate_uuid();
 
 std::vector<std::string> split(const std::string& s);
 
-void sigusr_1_handler(int signo, siginfo_t* info, void* context);
-
 void sigusr_handler(int signo, siginfo_t* info, void* context);
 
-void set_signals();
+void* exit_handler(void* args);
 
 #endif

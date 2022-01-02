@@ -3,7 +3,7 @@
 Client::Client(){};
 
 Client::~Client() {
-  if (threads_.size() > 0) delete_internal_threads();
+  if (threads_.size()) delete_internal_threads();
 };
 
 void Client::set_up(sockaddr_in server_address) { server_address_ = server_address; }
@@ -34,18 +34,35 @@ void Client::abort(std::string uuid) {
   pthread_mutex_unlock(&threads_mutex_);
 }
 
-void Client::pause_resume(std::string uuid) {
+void Client::pause(std::string uuid) {
+  std::cout << "[CLIENT]: Pausing task " << uuid << std::endl;
   if (threads_.find(uuid) == threads_.end()) {
     std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
     return;
   }
-  std::cout << "[CLIENT]: Pausing/resuming task" << std::endl;
+
   Socket socket(make_ip_address(0));
   Message msg;
-  EncodeAction(msg, server_action::pause_resume, threads_[uuid].server_task_uuid);
+  std::cout << threads_[uuid].server_task_uuid << std::endl;
+  EncodeAction(msg, server_action::pausar, threads_[uuid].server_task_uuid);
   socket.send_to(msg, server_address_);
+  threads_[uuid].pause = false;
   pthread_kill(threads_[uuid].fd, SIGUSR2);
-};
+}
+
+void Client::resume(std::string uuid) {
+  std::cout << "[CLIENT]: Resuming task " << uuid << std::endl;
+  if (threads_.find(uuid) == threads_.end()) {
+    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
+    return;
+  }
+  Socket socket(make_ip_address(0));
+  Message msg;
+  EncodeAction(msg, server_action::resumir, threads_[uuid].server_task_uuid);
+  socket.send_to(msg, server_address_);
+  threads_[uuid].pause = true;
+  pthread_kill(threads_[uuid].fd, SIGUSR1);
+}
 
 void* Client::internal_handler(void* args) {
   const auto [action, param, uuid, instance] = *static_cast<thread_args*>(args);
@@ -59,11 +76,28 @@ void* Client::internal_handler(void* args) {
 
     sockaddr_in worker_addr;
     socket.recieve_from(buffer, worker_addr);
-    DecodeAction(buffer, &instance->threads_[uuid].server_task_uuid);
+    auto retrieved_action = DecodeAction(buffer, &instance->threads_[uuid].server_task_uuid);
+    if (retrieved_action == server_action::abortar) {
+      throw std::runtime_error("El servidor ha cerrado la conexión. " +
+                               instance->threads_[uuid].server_task_uuid);
+    }
 
     bool end_found = false;
     while (!end_found && !instance->threads_[uuid].stop) {
-      socket.recieve_from(buffer, worker_addr);
+      ssize_t read = socket.recieve_from(buffer, worker_addr);
+      if (!read && errno == 4) {
+        continue;
+      }
+
+      try {
+        std::string param;
+        auto action = DecodeAction(buffer, &param);
+
+        if (action == server_action::close_connection) {
+          throw std::runtime_error("El servidor ha cerrado la conexión. " + param);
+        }
+      } catch (std::invalid_argument) {
+      }
 
       for (int i = 0; i < buffer.chunk_size; i++) {
         std::cout << buffer.text[i];
@@ -83,11 +117,14 @@ void* Client::internal_handler(void* args) {
   return nullptr;
 }
 
-void Client::delete_internal_threads() {
+void Client::stop() { delete_internal_threads(true); }
+
+void Client::delete_internal_threads(bool force) {
   std::cout << "[CLIENT]: Closing threads..." << std::endl;
 
   pthread_mutex_lock(&threads_mutex_);
   for (auto it = threads_.begin(); it != threads_.end(); it++) {
+    if (force) pthread_kill(it->second.fd, SIGUSR1);
     pthread_join(it->second.fd, nullptr);
 
     it->second.args;
@@ -110,9 +147,15 @@ void Client::delete_self(std::string uuid) {
   std::cout << "[CLIENT]: Deleted task " << uuid << std::endl;
 }
 
-void Client::info() {
-  std::cout << "Active tasks:" << std::endl;
-  for (auto it = threads_.begin(); it != threads_.end(); it++) {
-    std::cout << it->first << ": Running." << std::endl;
+void Client::info() const {
+  if (threads_.size()) {
+    std::cout << "[CLIENT]: Active tasks:" << std::endl;
+    for (auto it = threads_.begin(); it != threads_.end(); it++) {
+      std::cout << it->first << (it->second.pause ? ": Paused." : ": Running.") << std::endl;
+    }
+  } else {
+    std::cout << "[CLIENT]: No tasks running." << std::endl;
   }
 }
+
+bool Client::has_pending_tasks() const { return threads_.size(); }

@@ -104,18 +104,13 @@ std::vector<std::string> split(const std::string& s) {
 void sigusr_1_handler(int signo, siginfo_t* info, void* context) { info->si_errno = EINTR; }
 
 void sigusr_handler(int signo, siginfo_t* info, void* context) {
-  std::cout << signo << std::endl;
-  std::cout << info->si_errno << std::endl;
   switch (signo) {
     case SIGUSR1:
       info->si_errno = EINTR;
       return;
     case SIGUSR2:
-      if (info->si_errno == 128) {
-        info->si_errno = 0;
-        return;
-      };
-      info->si_errno = 128;
       pause();
+      info->si_errno = EINTR;
+      return;
   }
 }

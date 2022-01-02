@@ -31,6 +31,13 @@ size_t File::write(void* buf, size_t size) {
   return saved;
 }
 
+size_t File::rewind(size_t size) {
+  int prev_pos = position_;
+  position_ = position_ > size ? position_ - size : 0;
+
+  return position_ > size ? size : position_;
+}
+
 int File::size() const { return size_; }
 
 File::~File() {

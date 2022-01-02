@@ -16,8 +16,11 @@ class Client {
   void set_up(sockaddr_in server_address);
   void request(server_action action, std::string param = "");
   void abort(std::string uuid);
-  void pause_resume(std::string uuid);
-  void info();
+  void pause(std::string uuid);
+  void resume(std::string uuid);
+  void info() const;
+  bool has_pending_tasks() const;
+  void stop();
 
  private:
   struct thread_args {
@@ -31,6 +34,7 @@ class Client {
     pthread_t fd;
     std::string server_task_uuid;
     std::atomic<bool> stop = false;
+    std::atomic<bool> pause = false;
     thread_args* args = nullptr;
   };
 
@@ -42,6 +46,6 @@ class Client {
   static void* internal_handler(void* args);
 
   void delete_self(std::string uuid);
-  void delete_internal_threads();
+  void delete_internal_threads(bool force = false);
 };
 #endif

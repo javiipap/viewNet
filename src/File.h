@@ -35,6 +35,8 @@ class File {
 
   size_t write(void* buf, size_t size);
 
+  size_t rewind(size_t size);
+
   int size() const;
 
  private:

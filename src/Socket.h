@@ -29,4 +29,8 @@ class Socket {
   int fd_ = -2;
   pthread_mutex_t mutex_;
 };
+
+class socket_error : public std::system_error {
+  using system_error::system_error;
+};
 #endif

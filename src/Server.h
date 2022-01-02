@@ -25,41 +25,28 @@ class Server {
 
   void stop();
 
-  void info();
+  void info() const;
+
+  bool has_pending_tasks() const;
 
  private:
+  struct thread_args {
+    std::string param;
+    sockaddr_in client_addr;
+    std::string uuid;
+    Server* instance;
+  };
+
   struct thread_info {
     pthread_t fd;
     server_action type;
     std::atomic<bool> stop = false;
+    std::atomic<bool> pause = false;
     void* args = nullptr;
-  };
-
-  struct get_file_args {
-    const std::string& filename;
-    sockaddr_in& client_addr;
-    std::string uuid;
-    Server* instance;
-  };
-
-  struct general_args {
-    sockaddr_in& client_addr;
-    std::string uuid;
-    Server* instance;
-  };
-
-  struct main_thread_args {
-    int port;
-    std::vector<thread_info>& threads;
-    pthread_mutex_t& stop_server_mutex_;
-    AES& aes;
-    pthread_mutex_t& aes_mutex;
-    Server* instance;
   };
 
   AES aes_ = {AES::AES_256};
   std::unordered_map<std::string, thread_info> internal_threads_;
-  pthread_mutex_t stop_server_mutex_ = pthread_mutex_t();
   pthread_mutex_t aes_mutex_ = pthread_mutex_t();
   pthread_mutex_t threads_vector_mutex_ = pthread_mutex_t();
   int port_;
@@ -70,10 +57,14 @@ class Server {
   static void* get_file(void* args);
   static void* list(void* args);
 
+  static void* pause(void* args);
+  static void* resume(void* args);
   static void* pause_resume(void* args);
+
+  static void abort_client(sockaddr_in client_address, std::string error);
 
   void delete_self(std::string uuid);
 
-  void delete_internal_threads();
+  void delete_internal_threads(bool force = false);
 };
 #endif

@@ -10,8 +10,8 @@ Server::~Server() {
 }
 
 void* Server::get_file(void* args) {
-  const auto [filename, client_addr, uuid, instance] = *static_cast<get_file_args*>(args);
-
+  const auto [filename, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
+  sleep(10);
   try {
     int position = 0;
     int chunk = 1;
@@ -21,40 +21,46 @@ void* Server::get_file(void* args) {
     int size = 0;
 
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
-    msg.end_of_mesage = true;
     socket.send_to(msg, client_addr);
-    msg.end_of_mesage = false;
 
-    while (((chunk - 1) * MESSAGESIZE) < file.size() && !instance->internal_threads_[uuid].stop) {
+    while (((chunk - 1) * MESSAGESIZE) < file.size() &&
+           !instance->internal_threads_.at(uuid).stop) {
       position = file.read(&msg.text, MESSAGESIZE);
       size += position;
 
-      if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE != 0) {
+      msg.chunk_size = position;
+      if (size == file.size() && position % MESSAGESIZE != 0) {
         msg.text[position % MESSAGESIZE] = 0;
-        msg.end_of_mesage = true;
+        msg.chunk_size++;
       }
-      msg.chunk_size = position + 1;
       // pthread_mutex_lock(&aes_mutex);
       // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
       // pthread_mutex_unlock(&aes_mutex);
 
-      socket.send_to(msg, client_addr);
+      int sent = socket.send_to(msg, client_addr);
+      if (!sent && instance->internal_threads_[uuid].pause) {
+        instance->internal_threads_[uuid].pause = false;
+        socket.send_to(msg, client_addr);
+      }
 
-      if ((MESSAGESIZE * (chunk - 1) + position) == file.size() && position % MESSAGESIZE == 0) {
+      if (size == file.size() && position % MESSAGESIZE == 0) {
         msg.text[0] = 0;
         msg.chunk_size = 1;
-        msg.end_of_mesage = true;
         socket.send_to(msg, client_addr);
       }
       chunk++;
-      msg.chunk_idx = chunk - 1;
-      sleep(15);
-      // usleep(50000);  // Para que de tiempo a imprimir por pantalla antes de enviar el siguiente
+      usleep(50000);  // Para que de tiempo a imprimir por pantalla antes de enviar el siguiente
       // paquete.
     }
+    if (instance->internal_threads_.at(uuid).stop) {
+      std::cout << "[SERVER]: Terminated task " << uuid << std::endl;
+    };
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent " << filename << " successfully ("
-              << size << " bytes) = " << chunk << " chunks." << std::endl;
+              << size << " bytes) = " << chunk - 1 << " chunks." << std::endl;
+  } catch (socket_error& err) {
+    std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   } catch (std::exception& err) {
+    abort_client(client_addr, err.what());
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   }
 
@@ -63,7 +69,7 @@ void* Server::get_file(void* args) {
 }
 
 void* Server::list(void* args) {
-  const auto [client_addr, uuid, instance] = *static_cast<general_args*>(args);
+  const auto [_, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
   DIR* dir = opendir("public");
 
   if (dir == nullptr) {
@@ -79,11 +85,9 @@ void* Server::list(void* args) {
     Message msg;
 
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
-    msg.end_of_mesage = true;
     socket.send_to(msg, client_addr);
-    msg.end_of_mesage = false;
 
-    while ((dir_file = readdir(dir)) != nullptr && !instance->internal_threads_[uuid].stop) {
+    while ((dir_file = readdir(dir)) != nullptr && !instance->internal_threads_.at(uuid).stop) {
       int i = 0;
 
       std::string line;
@@ -106,7 +110,6 @@ void* Server::list(void* args) {
 
     if (msg.chunk_size + 1 < MESSAGESIZE) {
       msg.text[msg.chunk_size++] = 0;
-      msg.end_of_mesage = true;
       // pthread_mutex_lock(&aes_mutex);
       // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
       // pthread_mutex_unlock(&aes_mutex);
@@ -119,7 +122,6 @@ void* Server::list(void* args) {
     if (!terminated) {
       msg.text[0] = 0;
       msg.chunk_size = 1;
-      msg.end_of_mesage = true;
       // pthread_mutex_lock(&aes_mutex);
       // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
       // pthread_mutex_unlock(&aes_mutex);
@@ -128,7 +130,11 @@ void* Server::list(void* args) {
     }
 
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent directory list." << std::endl;
+  } catch (socket_error& err) {
+    std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   } catch (std::exception& err) {
+    abort_client(client_addr, err.what());
+
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   }
 
@@ -147,6 +153,7 @@ void Server::listen(int port) {
 
 void* Server::main_thread(void* args) {
   auto instance = static_cast<Server*>(args);
+
   try {
     auto server_addr = make_ip_address(instance->port_);
     Socket socket(server_addr);
@@ -158,7 +165,6 @@ void* Server::main_thread(void* args) {
     std::string uuid;
 
     while (true) {
-      pthread_mutex_unlock(&instance->stop_server_mutex_);
       read_bytes = socket.recieve_from(msg, client_addr);
 
       if (!read_bytes) {
@@ -166,13 +172,13 @@ void* Server::main_thread(void* args) {
         return nullptr;
       }
 
-      pthread_mutex_lock(&instance->stop_server_mutex_);
       std::string param;
       auto action = DecodeAction(msg, &param);
       pthread_mutex_lock(&instance->threads_vector_mutex_);
 
       if (action == server_action::abortar) {
-        std::cout << "[SERVER]: Stoping task " << param << std::endl;
+        std::cout << "[SERVER]: Aborting task " << param << std::endl;
+
         if (instance->internal_threads_.find(param) == instance->internal_threads_.end()) {
           std::cerr << "[SERVER]: No task found identified by" << param << std::endl;
           pthread_mutex_unlock(&instance->threads_vector_mutex_);
@@ -190,29 +196,39 @@ void* Server::main_thread(void* args) {
       instance->internal_threads_[uuid].fd = pthread_t();
       instance->internal_threads_[uuid].type = action;
       std::cout << "[SERVER]: Starting task " << uuid << std::endl;
+
       switch (action) {
         case server_action::get_file: {
           instance->internal_threads_[uuid].args =
-              new get_file_args{param, client_addr, uuid, instance};
+              new thread_args{param, client_addr, uuid, instance};
           pthread_create(&instance->internal_threads_[uuid].fd, nullptr, get_file,
                          instance->internal_threads_[uuid].args);
           break;
         }
         case server_action::list_files: {
-          instance->internal_threads_[uuid].args = new general_args{client_addr, uuid, instance};
+          instance->internal_threads_[uuid].args = new thread_args{"", client_addr, uuid, instance};
           pthread_create(&instance->internal_threads_[uuid].fd, nullptr, list,
                          instance->internal_threads_[uuid].args);
           break;
         }
-        case server_action::pause_resume: {
-          instance->internal_threads_[uuid].args = new general_args{client_addr, uuid, instance};
-          pthread_create(&instance->internal_threads_[uuid].fd, nullptr, pause_resume,
+        case server_action::pausar: {
+          instance->internal_threads_[uuid].args =
+              new thread_args{param, client_addr, uuid, instance};
+          pthread_create(&instance->internal_threads_[uuid].fd, nullptr, pause,
+                         instance->internal_threads_[uuid].args);
+          break;
+        }
+        case server_action::resumir: {
+          instance->internal_threads_[uuid].args =
+              new thread_args{param, client_addr, uuid, instance};
+          pthread_create(&instance->internal_threads_[uuid].fd, nullptr, resume,
                          instance->internal_threads_[uuid].args);
           break;
         }
         default:
           std::cout << "Te mamaste" << std::endl;
       }
+
       pthread_mutex_unlock(&instance->threads_vector_mutex_);
     }
   } catch (std::exception& err) {
@@ -222,49 +238,48 @@ void* Server::main_thread(void* args) {
   }
 }
 
-void Server::stop() {
-  pthread_mutex_unlock(&stop_server_mutex_);
-  pthread_kill(main_thread_.fd, SIGUSR1);
-};
+void Server::stop() { pthread_kill(main_thread_.fd, SIGUSR1); };
 
-void* Server::pause_resume(void* args) {
-  auto [client_addr, uuid, instance] = *static_cast<general_args*>(args);
+void* Server::pause(void* args) {
+  auto [target_uuid, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
+  std::cout << "[SERVER]: Pausing task " << target_uuid << std::endl;
 
-  try {
-    std::cout << "[SERVER]: Pausing/resuming task " << uuid << std::endl;
-    pthread_mutex_lock(&instance->threads_vector_mutex_);
-    if (instance->internal_threads_.find(uuid) == instance->internal_threads_.end()) {
-      std::cerr << "[SERVER]: No task found identified by" << uuid << std::endl;
-      pthread_mutex_unlock(&instance->threads_vector_mutex_);
-      return nullptr;
-    }
-
-    pthread_kill(instance->internal_threads_[uuid].fd, SIGUSR2);
-    pthread_mutex_unlock(&instance->threads_vector_mutex_);
-  } catch (std::exception& err) {
-    std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
+  if (instance->internal_threads_.find(target_uuid) == instance->internal_threads_.end()) {
+    std::cerr << "[SERVER]: No task found identified by" << target_uuid << std::endl;
+    return nullptr;
   }
 
+  instance->internal_threads_[target_uuid].pause = true;
+  pthread_kill(instance->internal_threads_[target_uuid].fd, SIGUSR2);
   instance->delete_self(uuid);
   return nullptr;
 }
 
-void Server::delete_internal_threads() {
+void* Server::resume(void* args) {
+  auto [target_uuid, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
+  std::cout << "[SERVER]: Resuming task " << target_uuid << std::endl;
+
+  if (instance->internal_threads_.find(target_uuid) == instance->internal_threads_.end()) {
+    std::cerr << "[SERVER]: No task found identified by" << target_uuid << std::endl;
+    return nullptr;
+  }
+
+  instance->internal_threads_[target_uuid].pause = false;
+  pthread_kill(instance->internal_threads_[target_uuid].fd, SIGUSR1);
+  instance->delete_self(uuid);
+  return nullptr;
+}
+
+void Server::delete_internal_threads(bool force) {
   std::cout << "[SERVER]: Closing threads..." << std::endl;
 
   pthread_mutex_lock(&threads_vector_mutex_);
   for (auto it = internal_threads_.begin(); it != internal_threads_.end(); it++) {
+    if (force) it->second.stop = true;
     pthread_join(it->second.fd, nullptr);
 
-    switch (it->second.type) {
-      case server_action::get_file:
-        delete static_cast<get_file_args*>(it->second.args);
-        break;
-      case server_action::list_files:
-      default:
-        delete static_cast<general_args*>(it->second.args);
-        break;
-    }
+    delete static_cast<thread_args*>(it->second.args);
+    internal_threads_.erase(it->first);
   }
   pthread_mutex_unlock(&threads_vector_mutex_);
   std::cout << "[SERVER]: Exit." << std::endl;
@@ -280,18 +295,28 @@ void Server::delete_self(std::string uuid) {
     return;
   }
 
-  switch (internal_threads_[uuid].type) {
-    case server_action::get_file:
-      delete static_cast<get_file_args*>(internal_threads_[uuid].args);
-      break;
-    case server_action::list_files:
-    default:
-      delete static_cast<general_args*>(internal_threads_[uuid].args);
-      break;
-  }
+  delete static_cast<thread_args*>(internal_threads_[uuid].args);
   internal_threads_.erase(uuid);
   pthread_mutex_unlock(&threads_vector_mutex_);
   std::cout << "[SERVER]: Deleted task " << uuid << std::endl;
 }
 
-void Server::info() { std::cout << "Threads: " << internal_threads_.size() << std::endl; }
+void Server::info() const {
+  if (internal_threads_.size()) {
+    std::cout << "[SERVER]: Active tasks:" << std::endl;
+    for (auto it = internal_threads_.begin(); it != internal_threads_.end(); it++) {
+      std::cout << it->first << (it->second.pause ? ": Paused." : ": Running.") << std::endl;
+    }
+  } else {
+    std::cout << "[SERVER]: No tasks running." << std::endl;
+  }
+}
+
+void Server::abort_client(sockaddr_in client_address, std::string error) {
+  Socket socket(make_ip_address(0));
+  Message msg;
+  EncodeAction(msg, server_action::abortar, error);
+  socket.send_to(msg, client_address);
+}
+
+bool Server::has_pending_tasks() const { return internal_threads_.size(); }

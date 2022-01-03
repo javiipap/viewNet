@@ -39,11 +39,12 @@ class Client {
   };
 
   sockaddr_in server_address_;
-  AES aes_ = AES(AES::AES_256);
   std::unordered_map<std::string, thread_info> threads_;
   pthread_mutex_t threads_mutex_ = pthread_mutex_t();
 
   static void* internal_handler(void* args);
+
+  static ssize_t recieve_encrypted(Message& message, Socket& socket, sockaddr_in& server_address);
 
   void delete_self(std::string uuid);
   void delete_internal_threads(bool force = false);

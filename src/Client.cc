@@ -75,7 +75,7 @@ void* Client::internal_handler(void* args) {
     socket.send_to(buffer, instance->server_address_);
 
     sockaddr_in worker_addr;
-    socket.recieve_from(buffer, worker_addr);
+    recieve_encrypted(buffer, socket, worker_addr);
     auto retrieved_action = DecodeAction(buffer, &instance->threads_[uuid].server_task_uuid);
     if (retrieved_action == server_action::abortar) {
       throw std::runtime_error("El servidor ha cerrado la conexión. " +
@@ -84,7 +84,7 @@ void* Client::internal_handler(void* args) {
 
     bool end_found = false;
     while (!end_found && !instance->threads_[uuid].stop) {
-      ssize_t read = socket.recieve_from(buffer, worker_addr);
+      ssize_t read = recieve_encrypted(buffer, socket, worker_addr);
       if (!read && errno == 4) {
         continue;
       }
@@ -108,6 +108,11 @@ void* Client::internal_handler(void* args) {
           break;
         }
       }
+    }
+
+    if (action == server_action::get_file) {
+      recieve_encrypted(buffer, socket, worker_addr);
+      std::cout << "\n" << buffer.text.data() << "\n" << std::endl;
     }
   } catch (std::exception& err) {
     std::cerr << "viewNet [CLIENT]: " << err.what() << std::endl;
@@ -159,3 +164,12 @@ void Client::info() const {
 }
 
 bool Client::has_pending_tasks() const { return threads_.size(); }
+
+ssize_t Client::recieve_encrypted(Message& message, Socket& socket, sockaddr_in& server_address) {
+  AES aes = {AES::AES_256};
+  Message buffer;
+  ssize_t read = socket.recieve_from(buffer, server_address);
+  aes.Decrypt(buffer.text.data(), MESSAGESIZE, message.text.data());
+  message.chunk_size = buffer.chunk_size;
+  return read;
+}

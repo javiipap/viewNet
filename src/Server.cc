@@ -11,7 +11,7 @@ Server::~Server() {
 
 void* Server::get_file(void* args) {
   const auto [filename, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
-  sleep(10);
+
   try {
     int position = 0;
     int chunk = 1;
@@ -21,7 +21,8 @@ void* Server::get_file(void* args) {
     int size = 0;
 
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
-    socket.send_to(msg, client_addr);
+
+    send_encrypted(msg, socket, client_addr);
 
     while (((chunk - 1) * MESSAGESIZE) < file.size() &&
            !instance->internal_threads_.at(uuid).stop) {
@@ -33,20 +34,19 @@ void* Server::get_file(void* args) {
         msg.text[position % MESSAGESIZE] = 0;
         msg.chunk_size++;
       }
-      // pthread_mutex_lock(&aes_mutex);
-      // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
-      // pthread_mutex_unlock(&aes_mutex);
 
-      int sent = socket.send_to(msg, client_addr);
+      int sent = send_encrypted(msg, socket, client_addr);
       if (!sent && instance->internal_threads_[uuid].pause) {
         instance->internal_threads_[uuid].pause = false;
-        socket.send_to(msg, client_addr);
+
+        send_encrypted(msg, socket, client_addr);
       }
 
       if (size == file.size() && position % MESSAGESIZE == 0) {
         msg.text[0] = 0;
         msg.chunk_size = 1;
-        socket.send_to(msg, client_addr);
+
+        send_encrypted(msg, socket, client_addr);
       }
       chunk++;
       usleep(50000);  // Para que de tiempo a imprimir por pantalla antes de enviar el siguiente
@@ -55,12 +55,21 @@ void* Server::get_file(void* args) {
     if (instance->internal_threads_.at(uuid).stop) {
       std::cout << "[SERVER]: Terminated task " << uuid << std::endl;
     };
+
+    std::string file_info = "Filename: " + filename + "\nSize: " + std::to_string(size) +
+                            "\nChunks: " + std::to_string(chunk - 1) +
+                            "\nsha256: " + instance->files_sha256_[filename];
+
+    memcpy(msg.text.data(), file_info.c_str(), file_info.size() + 1);
+    msg.chunk_size = file_info.size() + 1;
+    send_encrypted(msg, socket, client_addr);
+
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent " << filename << " successfully ("
               << size << " bytes) = " << chunk - 1 << " chunks." << std::endl;
   } catch (socket_error& err) {
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   } catch (std::exception& err) {
-    abort_client(client_addr, err.what());
+    abort_client(instance, client_addr, err.what());
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   }
 
@@ -71,6 +80,7 @@ void* Server::get_file(void* args) {
 void* Server::list(void* args) {
   const auto [_, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
   DIR* dir = opendir("public");
+  dirent* dir_file;
 
   if (dir == nullptr) {
     instance->delete_self(uuid);
@@ -79,13 +89,12 @@ void* Server::list(void* args) {
   }
 
   try {
-    dirent* dir_file;
     bool terminated = false;
     Socket socket(make_ip_address(0));
     Message msg;
 
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
-    socket.send_to(msg, client_addr);
+    send_encrypted(msg, socket, client_addr);
 
     while ((dir_file = readdir(dir)) != nullptr && !instance->internal_threads_.at(uuid).stop) {
       int i = 0;
@@ -96,11 +105,7 @@ void* Server::list(void* args) {
 
       for (const auto ch : line) {
         if (msg.chunk_size == MESSAGESIZE) {
-          // pthread_mutex_lock(&aes_mutex);
-          // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
-          // pthread_mutex_unlock(&aes_mutex);
-
-          socket.send_to(msg, client_addr);
+          send_encrypted(msg, socket, client_addr);
 
           msg.chunk_size = 0;
         }
@@ -110,11 +115,8 @@ void* Server::list(void* args) {
 
     if (msg.chunk_size + 1 < MESSAGESIZE) {
       msg.text[msg.chunk_size++] = 0;
-      // pthread_mutex_lock(&aes_mutex);
-      // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
-      // pthread_mutex_unlock(&aes_mutex);
 
-      socket.send_to(msg, client_addr);
+      send_encrypted(msg, socket, client_addr);
 
       terminated = true;
     }
@@ -122,28 +124,26 @@ void* Server::list(void* args) {
     if (!terminated) {
       msg.text[0] = 0;
       msg.chunk_size = 1;
-      // pthread_mutex_lock(&aes_mutex);
-      // aes.Encrypt(msg.text.data(), MESSAGESIZE, msg.text.data());
-      // pthread_mutex_unlock(&aes_mutex);
 
-      socket.send_to(msg, client_addr);
+      send_encrypted(msg, socket, client_addr);
     }
-
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent directory list." << std::endl;
   } catch (socket_error& err) {
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   } catch (std::exception& err) {
-    abort_client(client_addr, err.what());
+    abort_client(instance, client_addr, err.what());
 
     std::cerr << "viewNet [SERVER]: " << err.what() << std::endl;
   }
 
+  delete dir_file;
   closedir(dir);
   instance->delete_self(uuid);
   return nullptr;
 }
 
 void Server::listen(int port) {
+  store_hashes();
   port_ = port;
   std::cout << "[SERVER]: Setting up... " << std::endl;
   main_thread_.fd = pthread_t();
@@ -312,11 +312,44 @@ void Server::info() const {
   }
 }
 
-void Server::abort_client(sockaddr_in client_address, std::string error) {
+void Server::abort_client(Server* instance, sockaddr_in client_address, std::string error) {
   Socket socket(make_ip_address(0));
   Message msg;
   EncodeAction(msg, server_action::abortar, error);
-  socket.send_to(msg, client_address);
+
+  send_encrypted(msg, socket, client_address);
 }
 
 bool Server::has_pending_tasks() const { return internal_threads_.size(); }
+
+ssize_t Server::send_encrypted(const Message& msg, Socket& socket, const sockaddr_in client_addr) {
+  Message buffer;
+  AES aes = {AES::AES_256};
+
+  aes.Encrypt(msg.text.data(), MESSAGESIZE, buffer.text.data());
+  buffer.chunk_size = msg.chunk_size;
+  return socket.send_to(buffer, client_addr);
+}
+
+void Server::store_hashes() {
+  DIR* dir = opendir("public");
+  dirent* dir_file;
+  if (dir == nullptr) {
+    std::cerr << "viewNet [SERVER]: Error opening public directory." << std::endl;
+    return;
+  }
+
+  while ((dir_file = readdir(dir)) != nullptr) {
+    sha256 sha;
+    std::string filename = "public/";
+    filename += dir_file->d_name;
+    if (filename == "public/." || filename == "public/..") continue;
+    File file(filename);
+    std::vector<uint8_t> file_content(file.size());
+    file.read(file_content.data(), file.size());
+    files_sha256_[dir_file->d_name] = sha.digest(file_content.data(), file_content.size());
+  }
+
+  closedir(dir);
+  delete dir_file;
+}

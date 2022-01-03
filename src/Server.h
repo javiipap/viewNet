@@ -14,6 +14,7 @@
 #include "Socket.h"
 #include "dirent.h"
 #include "functions.h"
+#include "sha256.h"
 
 class Server {
  public:
@@ -45,13 +46,13 @@ class Server {
     void* args = nullptr;
   };
 
-  AES aes_ = {AES::AES_256};
   std::unordered_map<std::string, thread_info> internal_threads_;
-  pthread_mutex_t aes_mutex_ = pthread_mutex_t();
   pthread_mutex_t threads_vector_mutex_ = pthread_mutex_t();
   int port_;
   thread_info main_thread_;
   std::unordered_map<std::string, std::string> files_sha256_;
+
+  void store_hashes();
 
   static void* main_thread(void* args);
   static void* get_file(void* args);
@@ -61,10 +62,12 @@ class Server {
   static void* resume(void* args);
   static void* pause_resume(void* args);
 
-  static void abort_client(sockaddr_in client_address, std::string error);
+  static void abort_client(Server* instance, sockaddr_in client_address, std::string error);
 
   void delete_self(std::string uuid);
 
   void delete_internal_threads(bool force = false);
+
+  static ssize_t send_encrypted(const Message& msg, Socket& socket, const sockaddr_in client_addr);
 };
 #endif

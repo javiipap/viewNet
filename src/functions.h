@@ -35,24 +35,61 @@ struct main_output {
   int err;
 };
 
+/**
+ * @brief Dado un puerto y una ip se genera una estructura de tipo sockaddr_in.
+ * @param[in] port Puerto de la estructura.
+ * @param[in] ip_address Dirección de la estructura.
+ * @return Estructura generada.
+ */
 sockaddr_in make_ip_address(int port, const std::string& ip_address = std::string());
 
-std::string extract_string(const Message message);
-
-void* cli(void* args);
-
+/**
+ * @brief Revisa si una cadena de texto tiene un cierto prefijo.
+ * @param[in] haystack Cadena de texto.
+ * @param[in] neeldle Prefijo a comprobar.
+ */
 bool starts_with(const std::string haystack, const std::string needle);
 
+/**
+ * @brief Codifica una acción a un buffer de tipo mensaje.
+ * @param[out] buffer Buffer en donde guardar la acción.
+ * @param[in] action Acción a codificar.
+ * @param[in] param Posible parámetro a codificar junto con la acción.
+ */
 void EncodeAction(Message& buffer, server_action action, const std::string param = "");
 
+/**
+ * @brief Decodifica una acción de un buffer de tipo mensaje.
+ * @param[in] buffer Buffer de entrada.
+ * @param[out] param Posible parámetro decodificado.
+ * @return Acción decodificada.
+ */
 server_action DecodeAction(const Message& buffer, std::string* param = nullptr);
 
+/**
+ * @brief Genera un uuid.
+ */
 std::string generate_uuid();
 
+/**
+ * @brief Divide una cadena de entrada por espacios.
+ * @param[in] string Cadena de texto a dividir.
+ * @return Vector con los elementos divididos.
+ */
 std::vector<std::string> split(const std::string& s);
 
+/**
+ * @brief Manejador de las señales SIGUSR1 y SIGUSR2.
+ * @param[in] signo Identificador de la señal.
+ * @param[in] info Información del estado.
+ * @param[out] context Contexto general de la aplicación.
+ */
 void sigusr_handler(int signo, siginfo_t* info, void* context);
 
+/**
+ * @brief Fuerza la salida del programa parando el hilo principal.
+ * @param[in] args nullptr.
+ */
 void* exit_handler(void* args);
 
 #endif

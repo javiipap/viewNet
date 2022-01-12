@@ -8,60 +8,13 @@ Client::~Client() {
 
 void Client::set_up(sockaddr_in server_address) { server_address_ = server_address; }
 
-void Client::request(server_action action, std::string param) {
+std::string Client::request(server_action action, std::string param) {
   std::string uuid = generate_uuid();
   threads_[uuid].fd = pthread_t();
   threads_[uuid].args = new thread_args{action, param, uuid, this};
   pthread_create(&threads_[uuid].fd, nullptr, internal_handler, threads_[uuid].args);
-}
 
-void Client::abort(std::string uuid) {
-  if (threads_.find(uuid) == threads_.end()) {
-    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
-    return;
-  }
-
-  Socket socket(make_ip_address(0));
-  Message msg;
-  EncodeAction(msg, server_action::abortar, threads_[uuid].server_task_uuid);
-  socket.send_to(msg, server_address_);
-
-  std::cout << "[CLIENT]: Stoping task" << uuid << std::endl;
-
-  pthread_mutex_lock(&threads_mutex_);
-  threads_[uuid].stop = true;
-  pthread_kill(threads_[uuid].fd, SIGUSR1);
-  pthread_mutex_unlock(&threads_mutex_);
-}
-
-void Client::pause(std::string uuid) {
-  std::cout << "[CLIENT]: Pausing task " << uuid << std::endl;
-  if (threads_.find(uuid) == threads_.end()) {
-    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
-    return;
-  }
-
-  Socket socket(make_ip_address(0));
-  Message msg;
-  std::cout << threads_[uuid].server_task_uuid << std::endl;
-  EncodeAction(msg, server_action::pausar, threads_[uuid].server_task_uuid);
-  socket.send_to(msg, server_address_);
-  threads_[uuid].pause = false;
-  pthread_kill(threads_[uuid].fd, SIGUSR2);
-}
-
-void Client::resume(std::string uuid) {
-  std::cout << "[CLIENT]: Resuming task " << uuid << std::endl;
-  if (threads_.find(uuid) == threads_.end()) {
-    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
-    return;
-  }
-  Socket socket(make_ip_address(0));
-  Message msg;
-  EncodeAction(msg, server_action::resumir, threads_[uuid].server_task_uuid);
-  socket.send_to(msg, server_address_);
-  threads_[uuid].pause = true;
-  pthread_kill(threads_[uuid].fd, SIGUSR1);
+  return uuid;
 }
 
 void* Client::internal_handler(void* args) {
@@ -110,12 +63,17 @@ void* Client::internal_handler(void* args) {
       }
     }
 
-    if (action == server_action::get_file) {
+    if (action == server_action::get_file && !instance->threads_[uuid].stop) {
       recieve_encrypted(buffer, socket, worker_addr);
       std::cout << "\n" << buffer.text.data() << "\n" << std::endl;
     }
+
+    if (instance->threads_[uuid].stop) {
+      std::cout << "[CLIENT] (" << uuid << ") Recieved kill." << std::endl;
+    }
+
   } catch (std::exception& err) {
-    std::cerr << "viewNet [CLIENT]: " << err.what() << std::endl;
+    std::cerr << "[CLIENT] (" << uuid.substr(0, 4) << ") Error: " << err.what() << std::endl;
   }
 
   instance->delete_self(uuid);
@@ -124,12 +82,73 @@ void* Client::internal_handler(void* args) {
 
 void Client::stop() { delete_internal_threads(true); }
 
+void Client::abort(std::string uuid) {
+  std::cout << "[CLIENT]: Stoping task" << uuid << std::endl;
+
+  pthread_mutex_lock(&threads_mutex_);
+  if (threads_.find(uuid) == threads_.end()) {
+    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
+    return;
+  }
+
+  Socket socket(make_ip_address(0));
+  Message msg;
+  EncodeAction(msg, server_action::abortar, threads_[uuid].server_task_uuid);
+  socket.send_to(msg, server_address_);
+
+  threads_[uuid].stop = true;
+  pthread_mutex_unlock(&threads_mutex_);
+  pthread_kill(threads_[uuid].fd, SIGUSR1);
+}
+
+void Client::pause(std::string uuid) {
+  std::cout << "[CLIENT]: Pausing task " << uuid << std::endl;
+
+  pthread_mutex_lock(&threads_mutex_);
+  if (threads_.find(uuid) == threads_.end()) {
+    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
+    return;
+  }
+
+  Socket socket(make_ip_address(0));
+  Message msg;
+  std::cout << threads_[uuid].server_task_uuid << std::endl;
+  EncodeAction(msg, server_action::pausar, threads_[uuid].server_task_uuid);
+  socket.send_to(msg, server_address_);
+  threads_[uuid].pause = true;
+  pthread_mutex_unlock(&threads_mutex_);
+  pthread_kill(threads_[uuid].fd, SIGUSR2);
+}
+
+void Client::resume(std::string uuid) {
+  std::cout << "[CLIENT]: Resuming task " << uuid << std::endl;
+  pthread_mutex_lock(&threads_mutex_);
+
+  if (threads_.find(uuid) == threads_.end()) {
+    std::cerr << "[CLIENT]: No thread found identified by " << uuid << std::endl;
+    return;
+  }
+
+  threads_[uuid].pause = false;
+  pthread_kill(threads_[uuid].fd, SIGUSR1);
+
+  Socket socket(make_ip_address(0));
+  Message msg;
+  EncodeAction(msg, server_action::resumir, threads_[uuid].server_task_uuid);
+  socket.send_to(msg, server_address_);
+  pthread_mutex_unlock(&threads_mutex_);
+}
+
 void Client::delete_internal_threads(bool force) {
+  if (!threads_.size()) return;
   std::cout << "[CLIENT]: Closing threads..." << std::endl;
 
   pthread_mutex_lock(&threads_mutex_);
   for (auto it = threads_.begin(); it != threads_.end(); it++) {
-    if (force) pthread_kill(it->second.fd, SIGUSR1);
+    if (force) {
+      it->second.stop = true;
+      pthread_kill(it->second.fd, SIGUSR1);
+    };
     pthread_join(it->second.fd, nullptr);
 
     it->second.args;
@@ -139,17 +158,18 @@ void Client::delete_internal_threads(bool force) {
 }
 
 void Client::delete_self(std::string uuid) {
-  std::cout << "[CLIENT]: Closing task " << uuid << std::endl;
+  // std::cout << "[CLIENT] (" << uuid.substr(0, 4) << "): Closing task." << std::endl;
   pthread_mutex_lock(&threads_mutex_);
   if (threads_.find(uuid) == threads_.end()) {
     std::cerr << "[CLIENT]: No task found identified by " << uuid << std::endl;
     return;
   }
+
   pthread_join(threads_[uuid].fd, nullptr);
   delete threads_[uuid].args;
   threads_.erase(uuid);
   pthread_mutex_unlock(&threads_mutex_);
-  std::cout << "[CLIENT]: Deleted task " << uuid << std::endl;
+  std::cout << "[CLIENT] (" << uuid.substr(0, 4) << "): Task deleted." << std::endl;
 }
 
 void Client::info() const {
@@ -167,9 +187,7 @@ bool Client::has_pending_tasks() const { return threads_.size(); }
 
 ssize_t Client::recieve_encrypted(Message& message, Socket& socket, sockaddr_in& server_address) {
   AES aes = {AES::AES_256};
-  Message buffer;
-  ssize_t read = socket.recieve_from(buffer, server_address);
-  aes.Decrypt(buffer.text.data(), MESSAGESIZE, message.text.data());
-  message.chunk_size = buffer.chunk_size;
+  ssize_t read = socket.recieve_from(message, server_address);
+  aes.Decrypt(message.text.data(), MESSAGESIZE, message.text.data());
   return read;
 }

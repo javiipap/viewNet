@@ -1,4 +1,3 @@
-
 #include "Client.h"
 #include "Server.h"
 #include "functions.h"
@@ -6,6 +5,7 @@
 pthread_t main_thread = pthread_t();
 
 void* cli(void* args) {
+  std::string last_thread = "";
   main_output* output = new main_output{0};
 
   struct sigaction sigterm_action = {0};
@@ -21,7 +21,7 @@ void* cli(void* args) {
   Server server = Server();
   Client client = Client();
   client.set_up(make_ip_address(5555));
-  std::cout << "Bienvenido a viewNet" << std::endl;
+  std::cout << "Welcome to viewNet" << std::endl;
 
   while (true) {
     std::cout << "viewNet $> ";
@@ -44,27 +44,48 @@ void* cli(void* args) {
     } else if (user_input == "server off") {
       server.stop();
     } else if (starts_with(user_input, "get")) {
-      client.request(server_action::get_file, split(user_input)[1]);
+      last_thread = client.request(server_action::get_file, split(user_input)[1]);
     } else if (user_input == "list") {
-      client.request(server_action::list_files);
+      last_thread = client.request(server_action::list_files);
     } else if (starts_with(user_input, "abort")) {
       auto args = split(user_input);
-      if (args.size() < 2) {
-        std::cerr << "Falta un argumento." << std::endl;
+
+      if (args.size() < 2 && last_thread == "") {
+        std::cerr << "Missing argument." << std::endl;
+      } else if (args.size() < 2) {
+        client.abort(last_thread);
+        last_thread = "";
+      } else {
+        client.abort(args[1]);
       }
-      client.abort(args[1]);
     } else if (starts_with(user_input, "pause")) {
       auto args = split(user_input);
-      if (args.size() < 2) {
-        std::cerr << "Falta un argumento." << std::endl;
+
+      if (args.size() < 2 && last_thread == "") {
+        std::cerr << "Missing argument." << std::endl;
+      } else if (args.size() < 2) {
+        client.pause(last_thread);
+      } else {
+        client.pause(args[1]);
       }
-      client.pause(args[1]);
     } else if (starts_with(user_input, "resume")) {
       auto args = split(user_input);
-      if (args.size() < 2) {
-        std::cerr << "Falta un argumento." << std::endl;
+
+      if (args.size() < 2 && last_thread == "") {
+        std::cerr << "Missing argument." << std::endl;
+      } else if (args.size() < 2) {
+        client.resume(last_thread);
+      } else {
+        client.resume(args[1]);
       }
-      client.resume(args[1]);
+    } else if (starts_with(user_input, "set client port")) {
+      auto args = split(user_input);
+      if (args.size() < 4) {
+        std::cerr << "" << std::endl;
+      } else {
+        client.set_up(make_ip_address(stoi(args[3])));
+        std::cout << "[CLIENT]: Port changed successfully." << std::endl;
+      }
     } else if (user_input == "server info") {
       server.info();
     } else if (user_input == "client info") {
@@ -72,17 +93,19 @@ void* cli(void* args) {
     } else if (user_input == "exit") {
       if (client.has_pending_tasks()) {
         std::cout << "Hay tareas pendientes, ¿Forzar el cierre? [y/n]: ";
+        std::cout << "There are pending tasks, Force? [y/n]: ";
         std::cin >> user_input;
 
         if (user_input == "y") {
           client.stop();
         } else {
-          std::cout << "Se esperará a su finalización antes del cierre." << std::endl;
+          std::cout << "Tasks will be waited." << std::endl;
         }
       }
       break;
     } else if (user_input != "") {
-      std::cout << "Comando no reconocido." << std::endl;
+      std::cout << "Command not recognized. More information on available commands in README.md"
+                << std::endl;
     }
   }
 

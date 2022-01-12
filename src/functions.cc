@@ -10,20 +10,6 @@ sockaddr_in make_ip_address(int port, const std::string& ip_address) {
   return {AF_INET, htons(port), address};
 }
 
-std::string extract_string(Message message) {
-  std::string result;
-  for (const auto ch : message.text) {
-    result += ch;
-    if (ch == '\0') break;
-  }
-
-  if (result[result.length() - 1] != '\0') {
-    result += '\0';
-  }
-
-  return result;
-}
-
 void EncodeAction(Message& buffer, server_action action, const std::string param) {
   for (int i = 0; i < 6; i++) {
     buffer.text[i] = 0;

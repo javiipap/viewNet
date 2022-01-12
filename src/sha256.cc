@@ -26,7 +26,7 @@ std::string sha256::digest(uint8_t* input, size_t length) {
   for (uint8_t i = 0; i < 32; i++) {
     s << std::setw(2) << (unsigned int)out[i];
   }
-  std::cout << s.str() << std::endl;
+
   return s.str();
 }
 
@@ -91,7 +91,7 @@ void sha256::compress() {
 void sha256::padding(uint8_t* input, uint64_t length) {
   uint64_t size = length * 8;
 
-  int i = 0;
+  uint64_t i = 0;
   for (; i + 4 <= length; i += 4) {
     extendend_message.push_back(input[i] << 24 | input[i + 1] << 16 | input[i + 2] << 8 |
                                 input[i + 3]);

@@ -14,9 +14,10 @@ class sha256 {
   std::string digest(uint8_t* input, size_t length);
 
  private:
+  std::array<uint32_t, 64> chunk;
+  std::vector<uint32_t> extendend_message;
   std::array<uint32_t, 8> state = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
                                    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-
   const std::array<uint32_t, 64> round_constants = {
       0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
       0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -29,20 +30,40 @@ class sha256 {
       0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
       0xc67178f2};
 
-  std::array<uint32_t, 64> chunk;
-  std::vector<uint32_t> extendend_message;
-
+  /**
+   * @brief Añade un bit a uno al final del mensaje y completa con ceros hasta que la longitud del
+   *        buffer más 64 sea múltiplo de 512. Después se añade al final una palabra de 64 bits con
+   *        la longitud del mensaje original en bigendian.
+   * @param[in] input Buffer original.
+   * @param[in] length Tamaño del buffer original.
+   */
   void padding(uint8_t* input, uint64_t length);
 
+  /**
+   * @brief Carga en las 16 primeras palabras del chunk los correspondientes del mensaje extendido y
+   *        computa las 48 restantes utilizando s0 y s1.
+   */
   void msg_schedule();
 
+  /**
+   * @brief Desplaza los bits de una palabra de 32 bits hacia la derecha n posiciones.
+   *
+   */
   uint32_t rotate_right(uint32_t, uint32_t);
 
+  /**
+   * @brief Ronda del algoritmo que procesa un chunk modificando el estado interno.
+   */
   void compress();
+
   inline uint32_t choose(uint32_t e, uint32_t f, uint32_t g);
+
   inline uint32_t majority(uint32_t a, uint32_t b, uint32_t c);
+
   inline uint32_t sig0(uint32_t x);
+
   inline uint32_t sig1(uint32_t x);
+
   inline uint32_t sum(uint32_t a, uint32_t b);
 };
 #endif

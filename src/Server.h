@@ -1,3 +1,17 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * Server.h: Interfaz de la clase Server. Se encarga de servir archivos a un cliente.
+ * Revision history: 22/12/2021 -
+ *                   Creación (primera versión) del código
+ */
+
 #ifndef SERVER_H_
 #define SERVER_H_
 #include <pthread.h>

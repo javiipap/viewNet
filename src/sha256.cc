@@ -1,3 +1,20 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * sha256.cc: Implementación de la clase Socket. Se encarga de calcular el hash de un input de
+ *            tamaño variable de acuerdo con el estandar sha256.
+ * @ref
+ *      https://csrc.nist.gov/csrc/media/publications/fips/180/2/archive/2002-08-01/documents/fips180-2.pdf
+ * Revision history: 22/12/2021 -
+ *                   Creación (primera versión) del código
+ */
+
 #include "sha256.h"
 
 sha256::sha256() = default;

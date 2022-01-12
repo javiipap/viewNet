@@ -1,3 +1,17 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * main.cc: Punto de entrada de la aplicación.
+ * Revision history: 22/12/2021 -
+ *                   Creación (primera versión) del código
+ */
+
 #include "Client.h"
 #include "Server.h"
 #include "functions.h"

@@ -1,8 +1,21 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * functions.h: Definiciones de funciones de ayuda.
+ * Revision history: 22/12/2021 -
+ *                   Creación (primera versión) del código
+ */
+
 #ifndef FUNCTIONS_H_
 #define FUNCTIONS_H_
 
 #define WITH_PARAM_ACTION 0x80
-#define UUID_LENGTH 0x3c
 
 #include <arpa/inet.h>
 #include <netinet/in.h>

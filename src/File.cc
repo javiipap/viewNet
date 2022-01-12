@@ -1,3 +1,18 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice 6 - Simulación de DFAs
+ * Email: alu0101410463@ull.edu.es
+ * File.h: Interfaz de la clase File, encargada de gestionar la lectura y
+ *         escritura de archivos mapeados en memoria.
+ * Revision history:
+ *                29/10/2021 - Creation (first version) of the code
+ */
+
 #include "File.h"
 
 File::File(std::string pathname, int flags) {

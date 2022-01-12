@@ -1,3 +1,18 @@
+/**
+ * @author Javier Padilla Pío
+ * @date 22/12/2021
+ * Universidad de La Laguna
+ * Escuela Superior de Ingeniería y Tecnología
+ * Grado en ingeniería informática
+ * Curso: 2º
+ * Practice de programación: viewNet
+ * Email: alu0101410463@ull.edu.es
+ * Socket.h: Implementación de la clase Socket. Se encarga de manejar el descriptor de archivo de un
+ *           socket permitiendo enviar o recibir mensajes de otros sockets.
+ * Revision history: 22/12/2021 -
+ *                   Creación (primera versión) del código
+ */
+
 #include "Socket.h"
 
 Socket::Socket() = default;

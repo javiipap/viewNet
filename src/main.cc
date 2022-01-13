@@ -54,6 +54,10 @@ void* cli(void* args) {
       if (args.size() > 2) {
         port = stoi(args[2]);
       }
+      if (port < 1024) {
+        std::cerr << "[SERVER]: You require sudo privileges to use this port." << std::endl;
+        continue;
+      }
       server.listen(port);
     } else if (user_input == "server off") {
       server.stop();
@@ -97,6 +101,10 @@ void* cli(void* args) {
       if (args.size() < 4) {
         std::cerr << "" << std::endl;
       } else {
+        if (stoi(args[3]) < 1024) {
+          std::cerr << "[CLIENT]: You require sudo privileges to use this port." << std::endl;
+          continue;
+        }
         client.set_up(make_ip_address(stoi(args[3])));
         std::cout << "[CLIENT]: Port changed successfully." << std::endl;
       }

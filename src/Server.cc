@@ -25,7 +25,6 @@ Server::~Server() {
 
 void* Server::get_file(void* args) {
   const auto [filename, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
-  sleep(5);
   try {
     int position = 0;
     int chunk = 1;
@@ -38,6 +37,7 @@ void* Server::get_file(void* args) {
 
     send_encrypted(msg, socket, client_addr);
 
+  sleep(5);
     while (((chunk - 1) * MESSAGESIZE) < file.size() && !instance->threads_.at(uuid).stop) {
       position = file.read(&msg.text, MESSAGESIZE);
       size += position;

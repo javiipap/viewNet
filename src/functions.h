@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "Message.h"
+
 extern pthread_t main_thread;
 
 enum server_action {
@@ -41,7 +42,8 @@ enum server_action {
   pausar = WITH_PARAM_ACTION | 2,
   resumir = WITH_PARAM_ACTION | 3,
   retrieve_uuid = WITH_PARAM_ACTION | 4,
-  close_connection = WITH_PARAM_ACTION | 5
+  close_connection = WITH_PARAM_ACTION | 5,
+  exec_cmd = WITH_PARAM_ACTION | 6
 };
 
 struct main_output {

@@ -16,6 +16,7 @@
 #define SERVER_H_
 #include <pthread.h>
 #include <signal.h>
+#include <wait.h>
 
 #include <algorithm>
 #include <atomic>
@@ -109,6 +110,14 @@ class Server {
    * @return nullptr
    */
   static void* list(void* args);
+
+  /**
+   * @brief Hilo encargado de ejecutar un compado en el directorio del servidor y retornar la salida
+   *        al cliente.
+   * @param[in] args Puntero a una estructura de tipo thread_args.
+   * @return nullptr
+   */
+  static void* exec_cmd(void* args);
 
   /**
    * @brief Hilo encargado de pausar un hilo de tipo get_file o list. Envía una señal de tipo

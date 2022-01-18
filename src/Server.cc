@@ -37,7 +37,7 @@ void* Server::get_file(void* args) {
 
     send_encrypted(msg, socket, client_addr);
 
-  sleep(5);
+    sleep(5);
     while (((chunk - 1) * MESSAGESIZE) < file.size() && !instance->threads_.at(uuid).stop) {
       position = file.read(&msg.text, MESSAGESIZE);
       size += position;
@@ -190,26 +190,23 @@ void* Server::main_thread(void* args) {
       read_bytes = socket.recieve_from(msg, client_addr);
 
       if (!read_bytes) {
-        instance->delete_internal_threads();
+        instance->delete_internal_threads(true);
         return nullptr;
       }
 
       std::string param;
       auto action = DecodeAction(msg, &param);
-      pthread_mutex_lock(&instance->threads_mutex_);
 
       if (action == server_action::abortar) {
         std::cout << "[SERVER]: Aborting task " << param << std::endl;
 
         if (instance->threads_.find(param) == instance->threads_.end()) {
           std::cerr << "[SERVER]: No task found identified by" << param << std::endl;
-          pthread_mutex_unlock(&instance->threads_mutex_);
           continue;
         }
 
         instance->threads_[param].stop = true;
         pthread_kill(instance->threads_[param].fd, SIGUSR1);
-        pthread_mutex_unlock(&instance->threads_mutex_);
 
         continue;
       }
@@ -232,6 +229,12 @@ void* Server::main_thread(void* args) {
                          instance->threads_[uuid].args);
           break;
         }
+        case server_action::exec_cmd: {
+          instance->threads_[uuid].args = new thread_args{param, client_addr, uuid, instance};
+          pthread_create(&instance->threads_[uuid].fd, nullptr, exec_cmd,
+                         instance->threads_[uuid].args);
+          break;
+        }
         case server_action::pausar: {
           instance->threads_[uuid].args = new thread_args{param, client_addr, uuid, instance};
           pthread_create(&instance->threads_[uuid].fd, nullptr, pause,
@@ -247,12 +250,10 @@ void* Server::main_thread(void* args) {
         default:
           std::cout << "Te mamaste" << std::endl;
       }
-
-      pthread_mutex_unlock(&instance->threads_mutex_);
     }
   } catch (std::exception& err) {
     std::cerr << "[SERVER] (main) Critical error: " << err.what() << std::endl;
-    instance->delete_internal_threads();
+    instance->delete_internal_threads(true);
     return nullptr;
   }
 }
@@ -262,7 +263,6 @@ void Server::stop() { pthread_kill(main_thread_.fd, SIGUSR1); };
 void* Server::pause(void* args) {
   auto [target_uuid, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
   std::cout << "[SERVER]: Pausing task " << target_uuid << std::endl;
-  pthread_mutex_lock(&instance->threads_mutex_);
 
   if (instance->threads_.find(target_uuid) == instance->threads_.end()) {
     std::cerr << "[SERVER]: No task found identified by" << target_uuid << std::endl;
@@ -271,7 +271,6 @@ void* Server::pause(void* args) {
 
   instance->threads_[target_uuid].pause = true;
   pthread_kill(instance->threads_[target_uuid].fd, SIGUSR2);
-  pthread_mutex_unlock(&instance->threads_mutex_);
   instance->delete_self(uuid);
   return nullptr;
 }
@@ -279,7 +278,6 @@ void* Server::pause(void* args) {
 void* Server::resume(void* args) {
   auto [target_uuid, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
   std::cout << "[SERVER]: Resuming task " << target_uuid << std::endl;
-  pthread_mutex_lock(&instance->threads_mutex_);
 
   if (instance->threads_.find(target_uuid) == instance->threads_.end()) {
     std::cerr << "[SERVER]: No task found identified by" << target_uuid << std::endl;
@@ -288,7 +286,6 @@ void* Server::resume(void* args) {
 
   instance->threads_[target_uuid].pause = false;
   pthread_kill(instance->threads_[target_uuid].fd, SIGUSR1);
-  pthread_mutex_unlock(&instance->threads_mutex_);
   instance->delete_self(uuid);
   return nullptr;
 }
@@ -296,7 +293,6 @@ void* Server::resume(void* args) {
 void Server::delete_internal_threads(bool force) {
   std::cout << "[SERVER]: Closing threads..." << std::endl;
 
-  pthread_mutex_lock(&threads_mutex_);
   for (auto it = threads_.begin(); it != threads_.end(); it++) {
     if (force) {
       it->second.stop = true;
@@ -308,24 +304,20 @@ void Server::delete_internal_threads(bool force) {
     delete static_cast<thread_args*>(it->second.args);
     threads_.erase(it->first);
   }
-  pthread_mutex_unlock(&threads_mutex_);
   port_ = -1;
   std::cout << "[SERVER]: Exit." << std::endl;
 }
 
 void Server::delete_self(std::string uuid) {
   // std::cout << "[SERVER]" << uuid << ": Closing task" << std::endl;
-  pthread_mutex_lock(&threads_mutex_);
   pthread_join(threads_[uuid].fd, nullptr);
 
   if (threads_.find(uuid) == threads_.end()) {
-    pthread_mutex_unlock(&threads_mutex_);
     return;
   }
 
   delete static_cast<thread_args*>(threads_[uuid].args);
   threads_.erase(uuid);
-  pthread_mutex_unlock(&threads_mutex_);
   std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Task deleted" << std::endl;
 }
 

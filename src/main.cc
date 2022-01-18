@@ -114,7 +114,6 @@ void* cli(void* args) {
       client.info();
     } else if (user_input == "exit") {
       if (client.has_pending_tasks()) {
-        std::cout << "Hay tareas pendientes, ¿Forzar el cierre? [y/n]: ";
         std::cout << "There are pending tasks, Force? [y/n]: ";
         std::cin >> user_input;
 

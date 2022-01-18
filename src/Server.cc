@@ -159,6 +159,84 @@ void* Server::list(void* args) {
   return nullptr;
 }
 
+void* Server::exec_cmd(void* args) {
+  const auto [command, client_addr, uuid, instance] = *static_cast<thread_args*>(args);
+
+  try {
+    std::array<int, 2> fds;
+    int return_code = pipe(fds.data());
+
+    if (return_code < 0) {
+      throw std::system_error(errno, std::system_category(), "Could not create pipe.");
+    }
+
+    Socket socket(make_ip_address(0));
+    Message buffer;
+
+    EncodeAction(buffer, server_action::retrieve_uuid, uuid);
+    send_encrypted(buffer, socket, client_addr);
+
+    int pid = fork();
+    if (pid == 0) {
+      close(fds[0]);
+
+      dup2(fds[1], STDOUT_FILENO);
+      dup2(fds[1], STDERR_FILENO);
+      close(fds[1]);
+
+      auto raw_argv = split(command);
+      char** argv = new char*[raw_argv.size() + 1];
+
+      for (int i = 0; i < raw_argv.size(); i++) {
+        argv[i] = new char[raw_argv[i].size() + 1];
+        raw_argv[i].copy(argv[i], raw_argv[i].size());
+        argv[i][raw_argv[i].size()] = 0;
+      }
+
+      argv[raw_argv.size()] = nullptr;
+
+      int result = execvp(argv[0], argv);
+      if (result < 0) {
+        std::cerr << "[SERVER] (" << uuid.substr(0, 4)
+                  << ") Error: Could not run command: " << raw_argv[0] << std::endl;
+      }
+      exit(0);
+    } else if (pid > 0) {
+      close(fds[1]);
+
+      do {
+        buffer.chunk_size = read(fds[0], buffer.text.data(), MESSAGESIZE);
+
+        if (buffer.chunk_size > 0) {
+          send_encrypted(buffer, socket, client_addr);
+        }
+      } while (buffer.chunk_size > 0);
+
+      buffer.text[0] = 0;
+      buffer.chunk_size = 1;
+
+      send_encrypted(buffer, socket, client_addr);
+
+      close(fds[0]);
+
+      int status;
+      wait(&status);
+    } else {
+      std::cerr << "SERVER (" << uuid.substr(0, 4) << ") Error: Could not run command."
+                << std::endl;
+    }
+  } catch (socket_error& err) {
+    std::cerr << "[SERVER] (" << uuid.substr(0, 4) << ") Error: " << err.what() << std::endl;
+  } catch (std::exception& err) {
+    abort_client(instance, client_addr, err.what());
+
+    std::cerr << "[SERVER] (" << uuid.substr(0, 4) << ") Error: " << err.what() << std::endl;
+  }
+
+  instance->delete_self(uuid);
+  return nullptr;
+}
+
 void Server::listen(int port) {
   if (port_ != -1) {
     std::cerr << "[SERVER]: El servidor ya se está ejecutando en el puerto " << port_ << std::endl;

@@ -99,6 +99,8 @@ void* Client::internal_handler(void* args) {
 
 void Client::stop() { delete_internal_threads(true); }
 
+void Client::wait(std::string uuid) { pthread_join(threads_.at(uuid).fd, nullptr); }
+
 void Client::abort(std::string uuid) {
   std::cout << "[CLIENT]: Stoping task" << uuid << std::endl;
 

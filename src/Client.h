@@ -58,9 +58,11 @@ class Client {
   /**
    * @brief Resume el hilo parado y luego envía una señal al servidor para reanudar el envío de
    *        paquetes.
-   * @param[in] uui Identificador del hilo de recepción.
+   * @param[in] uuid Identificador del hilo de recepción.
    */
   void resume(std::string uuid);
+
+  void wait(std::string uuid);
 
   /**
    * @brief Imprime por pantalla el estado de ejecución de los hilos existentes.

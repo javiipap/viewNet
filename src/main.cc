@@ -112,6 +112,9 @@ void* cli(void* args) {
       server.info();
     } else if (user_input == "client info") {
       client.info();
+    } else if (starts_with(user_input, "/run")) {
+      std::string uuid = client.request(server_action::exec_cmd, user_input.substr(5));
+      client.wait(uuid);
     } else if (user_input == "exit") {
       if (client.has_pending_tasks()) {
         std::cout << "There are pending tasks, Force? [y/n]: ";

@@ -54,6 +54,8 @@ class Server {
    */
   void info() const;
 
+  void stats() const;
+
   /**
    * @brief Retorna verdadero si hay hilos ejecutando o en espera.
    */
@@ -80,6 +82,9 @@ class Server {
   int port_ = -1;
   thread_info main_thread_;
   std::unordered_map<std::string, std::string> files_sha256_;
+  std::atomic<uint32_t> sent_bytes = 0;
+  std::atomic<uint32_t> sent_files = 0;
+  std::atomic<uint32_t> sent_chunks = 0;
 
   /**
    * @brief Computa los hashes de todos los archivos en el directorio public/ y los guarda en

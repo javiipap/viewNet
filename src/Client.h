@@ -62,12 +62,18 @@ class Client {
    */
   void resume(std::string uuid);
 
+  /**
+   * @brief Espera hasta el retorno de un hilo.
+   * @param[in] uuid Identificador del hilo.
+   */
   void wait(std::string uuid);
 
   /**
    * @brief Imprime por pantalla el estado de ejecución de los hilos existentes.
    */
   void info() const;
+
+  void stats() const;
 
   /**
    * @brief Retorna verdadero si hay hilos ejecutando o en espera.
@@ -98,6 +104,9 @@ class Client {
   sockaddr_in server_address_;
   std::unordered_map<std::string, thread_info> threads_;
   pthread_mutex_t threads_mutex_ = pthread_mutex_t();
+  std::atomic<uint32_t> recieved_bytes = 0;
+  std::atomic<uint32_t> recieved_files = 0;
+  std::atomic<uint32_t> recieved_chunks = 0;
 
   /**
    * @brief Hilo encargado de hacer peticiones al servidor y mostrar la respuesta por pantalla.

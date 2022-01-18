@@ -36,6 +36,8 @@ void* Server::get_file(void* args) {
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
 
     send_encrypted(msg, socket, client_addr);
+    instance->sent_bytes += msg.chunk_size;
+    instance->sent_chunks++;
 
     sleep(5);
     while (((chunk - 1) * MESSAGESIZE) < file.size() && !instance->threads_.at(uuid).stop) {
@@ -49,10 +51,15 @@ void* Server::get_file(void* args) {
       }
 
       int sent = send_encrypted(msg, socket, client_addr);
+      instance->sent_bytes += msg.chunk_size;
+      instance->sent_chunks++;
+
       if (!sent && instance->threads_[uuid].pause) {
         instance->threads_[uuid].pause = false;
 
         send_encrypted(msg, socket, client_addr);
+        instance->sent_bytes += msg.chunk_size;
+        instance->sent_chunks++;
       }
 
       if (size == file.size() && position % MESSAGESIZE == 0) {
@@ -60,6 +67,8 @@ void* Server::get_file(void* args) {
         msg.chunk_size = 1;
 
         send_encrypted(msg, socket, client_addr);
+        instance->sent_bytes += msg.chunk_size;
+        instance->sent_chunks++;
       }
       chunk++;
       usleep(50000);  // Para que de tiempo a imprimir por pantalla antes de enviar el siguiente
@@ -78,7 +87,12 @@ void* Server::get_file(void* args) {
 
     memcpy(msg.text.data(), file_info.c_str(), file_info.size() + 1);
     msg.chunk_size = file_info.size() + 1;
+
     send_encrypted(msg, socket, client_addr);
+    instance->sent_bytes += msg.chunk_size;
+    instance->sent_chunks++;
+
+    instance->sent_files++;
 
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent " << filename << " successfully ("
               << size << " bytes) = " << chunk - 1 << " chunks." << std::endl;
@@ -112,6 +126,8 @@ void* Server::list(void* args) {
 
     EncodeAction(msg, server_action::retrieve_uuid, uuid);
     send_encrypted(msg, socket, client_addr);
+    instance->sent_bytes += msg.chunk_size;
+    instance->sent_chunks++;
 
     while ((dir_file = readdir(dir)) != nullptr && !instance->threads_.at(uuid).stop) {
       int i = 0;
@@ -123,6 +139,8 @@ void* Server::list(void* args) {
       for (const auto ch : line) {
         if (msg.chunk_size == MESSAGESIZE) {
           send_encrypted(msg, socket, client_addr);
+          instance->sent_bytes += msg.chunk_size;
+          instance->sent_chunks++;
 
           msg.chunk_size = 0;
         }
@@ -134,6 +152,8 @@ void* Server::list(void* args) {
       msg.text[msg.chunk_size++] = 0;
 
       send_encrypted(msg, socket, client_addr);
+      instance->sent_bytes += msg.chunk_size;
+      instance->sent_chunks++;
 
       terminated = true;
     }
@@ -143,6 +163,8 @@ void* Server::list(void* args) {
       msg.chunk_size = 1;
 
       send_encrypted(msg, socket, client_addr);
+      instance->sent_bytes += msg.chunk_size;
+      instance->sent_chunks++;
     }
     std::cout << "[SERVER] (" << uuid.substr(0, 4) << "): Sent directory list." << std::endl;
   } catch (socket_error& err) {
@@ -175,6 +197,8 @@ void* Server::exec_cmd(void* args) {
 
     EncodeAction(buffer, server_action::retrieve_uuid, uuid);
     send_encrypted(buffer, socket, client_addr);
+    instance->sent_bytes += buffer.chunk_size;
+    instance->sent_chunks++;
 
     int pid = fork();
     if (pid == 0) {
@@ -209,6 +233,8 @@ void* Server::exec_cmd(void* args) {
 
         if (buffer.chunk_size > 0) {
           send_encrypted(buffer, socket, client_addr);
+          instance->sent_bytes += buffer.chunk_size;
+          instance->sent_chunks++;
         }
       } while (buffer.chunk_size > 0);
 
@@ -216,6 +242,8 @@ void* Server::exec_cmd(void* args) {
       buffer.chunk_size = 1;
 
       send_encrypted(buffer, socket, client_addr);
+      instance->sent_bytes += buffer.chunk_size;
+      instance->sent_chunks++;
 
       close(fds[0]);
 
@@ -410,12 +438,19 @@ void Server::info() const {
   }
 }
 
+void Server::stats() const {
+  std::cout << "[SERVER]: Statistics:\n\tSent bytes: " << sent_bytes
+            << "\n\tSent chunks: " << sent_chunks << "\n\tSent files: " << sent_files << std::endl;
+}
+
 void Server::abort_client(Server* instance, sockaddr_in client_address, std::string error) {
   Socket socket(make_ip_address(0));
   Message msg;
   EncodeAction(msg, server_action::abortar, error);
 
   send_encrypted(msg, socket, client_address);
+  instance->sent_chunks++;
+  instance->sent_bytes += msg.chunk_size;
 }
 
 bool Server::has_pending_tasks() const { return threads_.size(); }

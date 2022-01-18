@@ -18,6 +18,7 @@
 #define WITH_PARAM_ACTION 0x80
 
 #include <arpa/inet.h>
+#include <getopt.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
@@ -46,7 +47,30 @@ enum server_action {
   exec_cmd = WITH_PARAM_ACTION | 6
 };
 
-struct main_output {
+const struct option longopts[] = {
+    {"help", no_argument, 0, 'h'},
+    {"client", required_argument, 0, 'c'},
+    {"server", required_argument, 0, 's'},
+    {"port", required_argument, 0, 'p'},
+    {0, 0, 0, 0},
+};
+
+struct CLI_arguments_parser {
+  uint32_t server_port = 5555;
+  uint32_t listen_port = 5555;
+  std::string server_ip = "0.0.0.0";
+  bool show_help = false;
+  bool server_mode = false;
+
+  CLI_arguments_parser(int argc, char* argv[]);
+};
+
+struct cli_args {
+  int argc;
+  char** argv;
+};
+
+struct cli_output {
   int err;
 };
 

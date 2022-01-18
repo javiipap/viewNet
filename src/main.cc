@@ -19,24 +19,51 @@
 pthread_t main_thread = pthread_t();
 
 void* cli(void* args) {
+  const auto [argc, argv] = *static_cast<cli_args*>(args);
+  cli_output* output = new cli_output{0};
+
+  CLI_arguments_parser parsed_args(argc, argv);
+
+  if (parsed_args.show_help) {
+    std::cout
+        << "Bienvenido a viewNet, un programa para intercambiar archivos entre dos ordenadores.\n"
+           "Los comandos disponibles son los siguientes:\n"
+           "\t- server on `port`: Enciende el servidor en el puerto especificado. El cliente "
+           "escucha por default en el puerto 5555, que tambien es el predefinido del servidor, por "
+           "lo que se recomienda no especificar un puerto al llamar a este comando.\n"
+           "\t- server off: Apaga el servidor en caso de estar encendido.\n"
+           "\t- list [CLIENT]: Pide al servidor el contenido del directorio public.\n"
+           "\t- get `filename` [CLIENT]: Pide el archivo `filename` al servidor.\n"
+           "\t- abort `uuid` [CLIENT]: Aborta el hilo identificado por el `uuid` en el cliente y "
+           "el que está enviando en el servidor.\n"
+           "\t- pause `uuid` [CLIENT]: Pausa el hilo identificado por el `uuid` en el cliente y el "
+           "que está enviando en el servidor.\n"
+           "\t- resume `uuid` [CLIENT]: Reanuda el hilo identificado por el `uuid` en el cliente y "
+           "el que está enviando en el servidor.\n"
+           "\t- client info: Devuelve algo de información acerca de los hilos en ejecución del "
+           "cliente.\n"
+           "\t- server info: Devuelve algo de información acerca de los hilos en ejecución del "
+           "servidor.\n"
+           "\t- stats: Imprime la información de transferencia cliente-servidor.\n"
+           "\t- /run `command arg1 arg2...`: Ejecuta el comando dado en el servidor.\n"
+           "\t- exit: Salir del programa.\n"
+           "\n"
+           "En caso de no especificar un `uuid` en los comandos abort, pause y resume, se "
+           "intentará actuar sobre el último hilo creado."
+        << std::endl;
+    return output;
+  }
+
   std::string last_thread = "";
-  main_output* output = new main_output{0};
-
-  struct sigaction sigterm_action = {0};
-
-  sigterm_action.sa_flags = SA_SIGINFO;
-  sigterm_action.sa_sigaction = &sigusr_handler;
-
-  sigaction(SIGUSR1, &sigterm_action, nullptr);
-  sigaction(SIGUSR2, &sigterm_action, nullptr);
-
-  std::string user_input;
 
   Server server = Server();
   Client client = Client();
-  client.set_up(make_ip_address(5555));
+  client.set_up(make_ip_address(parsed_args.server_port, parsed_args.server_ip));
+  if (parsed_args.server_mode) server.listen(parsed_args.listen_port);
+
   std::cout << "Welcome to viewNet" << std::endl;
 
+  std::string user_input;
   while (true) {
     std::cout << "viewNet $> ";
 
@@ -50,10 +77,8 @@ void* cli(void* args) {
 
     if (starts_with(user_input, "server on")) {
       auto args = split(user_input);
-      int port = 5555;
-      if (args.size() > 2) {
-        port = stoi(args[2]);
-      }
+      int port = args.size() > 2 ? stoi(args[2]) : parsed_args.listen_port;
+
       if (port < 1024) {
         std::cerr << "[SERVER]: You require sudo privileges to use this port." << std::endl;
         continue;
@@ -115,6 +140,9 @@ void* cli(void* args) {
     } else if (starts_with(user_input, "/run")) {
       std::string uuid = client.request(server_action::exec_cmd, user_input.substr(5));
       client.wait(uuid);
+    } else if (user_input == "stats") {
+      client.stats();
+      server.stats();
     } else if (user_input == "exit") {
       if (client.has_pending_tasks()) {
         std::cout << "There are pending tasks, Force? [y/n]: ";
@@ -136,7 +164,8 @@ void* cli(void* args) {
   return output;
 }
 
-int main() {
+int main(int argc, char** argv) {
+  // Bloquear señales.
   sigset_t set;
   sigemptyset(&set);
   sigaddset(&set, SIGINT);
@@ -144,8 +173,18 @@ int main() {
   sigaddset(&set, SIGHUP);
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 
-  pthread_create(&main_thread, nullptr, &cli, nullptr);
+  // Añadir manejador para señales de usuario.
+  struct sigaction sigterm_action = {0};
+  sigterm_action.sa_flags = SA_SIGINFO;
+  sigterm_action.sa_sigaction = &sigusr_handler;
+  sigaction(SIGUSR1, &sigterm_action, nullptr);
+  sigaction(SIGUSR2, &sigterm_action, nullptr);
 
+  // Hilo principal
+  cli_args args = {argc, argv};
+  pthread_create(&main_thread, nullptr, &cli, &args);
+
+  // Hilo para manejar errores
   pthread_t exit_handler_thread = pthread_t();
   pthread_create(&exit_handler_thread, nullptr, &exit_handler, nullptr);
   pthread_detach(exit_handler_thread);

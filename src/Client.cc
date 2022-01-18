@@ -43,6 +43,9 @@ void* Client::internal_handler(void* args) {
 
     sockaddr_in worker_addr;
     recieve_encrypted(buffer, socket, worker_addr);
+    instance->recieved_chunks++;
+    instance->recieved_bytes += buffer.chunk_size;
+
     auto retrieved_action = DecodeAction(buffer, &instance->threads_[uuid].server_task_uuid);
     if (retrieved_action == server_action::abortar) {
       throw std::runtime_error("El servidor ha cerrado la conexión. " +
@@ -55,6 +58,8 @@ void* Client::internal_handler(void* args) {
       if (!read && errno == 4) {
         continue;
       }
+      instance->recieved_chunks++;
+      instance->recieved_bytes += buffer.chunk_size;
 
       try {
         std::string param;
@@ -79,6 +84,9 @@ void* Client::internal_handler(void* args) {
 
     if (action == server_action::get_file && !instance->threads_[uuid].stop) {
       recieve_encrypted(buffer, socket, worker_addr);
+      instance->recieved_files++;
+      instance->recieved_chunks++;
+      instance->recieved_bytes += buffer.chunk_size;
       std::cout << "\n" << buffer.text.data() << "\n" << std::endl;
     }
 
@@ -190,6 +198,12 @@ void Client::info() const {
   } else {
     std::cout << "[CLIENT]: No tasks running." << std::endl;
   }
+}
+
+void Client::stats() const {
+  std::cout << "[CLIENT]: Statistics:\n\tRecieved bytes: " << recieved_bytes
+            << "\n\tRecieved chunks: " << recieved_chunks
+            << "\n\tRecieved files: " << recieved_files << std::endl;
 }
 
 bool Client::has_pending_tasks() const { return threads_.size(); }

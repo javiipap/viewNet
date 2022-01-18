@@ -14,6 +14,32 @@
 
 #include "functions.h"
 
+CLI_arguments_parser::CLI_arguments_parser(int argc, char* argv[]) {
+  int c;
+  int idx;
+  while ((c = getopt_long(argc, argv, "hs:p:c:", longopts, &idx)) != -1) {
+    switch (c) {
+      case 'h':
+        show_help = true;
+        break;
+      case 'c':
+        server_ip = optarg;
+        break;
+      case 's':
+        server_mode = true;
+        listen_port = std::atoi(optarg);
+        break;
+      case 'p':
+        server_port = std::atoi(optarg);
+        break;
+      case '?':
+        throw std::invalid_argument("Argumento de línea de comandos desconocido");
+      default:
+        throw std::runtime_error("Error procesando la línea de comandos");
+    }
+  }
+}
+
 sockaddr_in make_ip_address(int port, const std::string& ip_address) {
   in_addr address;
   if (ip_address.length())

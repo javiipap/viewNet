@@ -439,8 +439,8 @@ void Server::info() const {
 }
 
 void Server::stats() const {
-  std::cout << "[SERVER]: Statistics:\n\tSent bytes: " << sent_bytes
-            << "\n\tSent chunks: " << sent_chunks << "\n\tSent files: " << sent_files << std::endl;
+  std::cout << "[SERVER]:\n\tSent bytes: " << sent_bytes << "\n\tSent chunks: " << sent_chunks
+            << "\n\tSent files: " << sent_files << std::endl;
 }
 
 void Server::abort_client(Server* instance, sockaddr_in client_address, std::string error) {

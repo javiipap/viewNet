@@ -17,6 +17,7 @@
 CLI_arguments_parser::CLI_arguments_parser(int argc, char* argv[]) {
   int c;
   int idx;
+
   while ((c = getopt_long(argc, argv, "hs:p:c:", longopts, &idx)) != -1) {
     switch (c) {
       case 'h':
@@ -33,9 +34,9 @@ CLI_arguments_parser::CLI_arguments_parser(int argc, char* argv[]) {
         server_port = std::atoi(optarg);
         break;
       case '?':
-        throw std::invalid_argument("Argumento de línea de comandos desconocido");
       default:
-        throw std::runtime_error("Error procesando la línea de comandos");
+        valid = false;
+        break;
     }
   }
 }

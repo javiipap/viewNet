@@ -24,6 +24,12 @@ void* cli(void* args) {
 
   CLI_arguments_parser parsed_args(argc, argv);
 
+  if (!parsed_args.valid) {
+    output->err = 1;
+    std::cerr << "[PANIC]: Error parsing arguments." << std::endl;
+    return output;
+  }
+
   if (parsed_args.show_help) {
     std::cout
         << "Bienvenido a viewNet, un programa para intercambiar archivos entre dos ordenadores.\n"

@@ -61,6 +61,7 @@ struct CLI_arguments_parser {
   std::string server_ip = "0.0.0.0";
   bool show_help = false;
   bool server_mode = false;
+  bool valid = true;
 
   CLI_arguments_parser(int argc, char* argv[]);
 };

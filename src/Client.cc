@@ -201,7 +201,7 @@ void Client::info() const {
 }
 
 void Client::stats() const {
-  std::cout << "[CLIENT]: Statistics:\n\tRecieved bytes: " << recieved_bytes
+  std::cout << "[CLIENT]:\n\tRecieved bytes: " << recieved_bytes
             << "\n\tRecieved chunks: " << recieved_chunks
             << "\n\tRecieved files: " << recieved_files << std::endl;
 }
